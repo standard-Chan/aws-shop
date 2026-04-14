@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: my-app
+
+  config:
+    import: optional:file:.env[.properties]
+
+  profiles:
+    active: dev   # ?? ?? ??
+
+server:
+  port: 8080

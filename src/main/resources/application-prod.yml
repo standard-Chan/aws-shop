@@ -1,0 +1,24 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  docker:
+    compose:
+      enabled: true
+
+  datasource:
+    url: jdbc:${DB}://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:mydb}?${DB_SETTINGS}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  logging:
+    level:
+      root: info
+      org.hibernate.SQL: warn
+      org.springframework: warn
