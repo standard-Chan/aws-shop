@@ -19,18 +19,28 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testAnnotationProcessor 'org.projectlombok:lombok'
+    // --- Spring Boot ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'    // 데이터베이스 연동 및 ORM(JPA/Hibernate) 관리
+    implementation 'org.springframework.boot:spring-boot-starter-web'        // 웹 애플리케이션 개발 (REST API, MVC)
+
+    // --- Database (런타임 환경) ---
+    runtimeOnly 'com.mysql:mysql-connector-j'                               // MySQL 드라이버
+
+    // --- Lombok (생산성 도구) ---
+    compileOnly 'org.projectlombok:lombok'                                  // 컴파일 시점에만 사용 (Getter, Setter 등 자동 생성)
+    annotationProcessor 'org.projectlombok:lombok'                         // 컴파일 시 어노테이션 처리를 위한 프로세서
+
+    // --- Development Tools (개발 환경 편의성) ---
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'         // 코드 변경 시 자동 재시작 등 개발 편의 기능
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'   // Docker Compose 연동 및 자동 컨테이너 관리
+
+    // --- Unit & Integration Testing (테스트 환경) ---
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'   // 기본적인 스프링 부트 테스트 지원 (JUnit, Mockito 등)
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'            // IDE나 빌드 도구에서 JUnit을 실행하기 위한 런처
+
+    // --- Test Environment Lombok (테스트 코드 내 사용) ---
+    testCompileOnly 'org.projectlombok:lombok'                              // 테스트 코드 내 Lombok 사용 설정
+    testAnnotationProcessor 'org.projectlombok:lombok'                     // 테스트 환경용 Lombok 어노테이션 프로세서
 }
 
 tasks.named('test') {
