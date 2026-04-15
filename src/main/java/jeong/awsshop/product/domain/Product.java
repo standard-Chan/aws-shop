@@ -1,17 +1,15 @@
 package jeong.awsshop.product.domain;
 
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.NoArgsConstructor;
 
 @Entity
@@ -22,8 +20,8 @@ public class Product {
     private Long id;
 
     // 제품의 고유 식별자 역할을 하는 ASIN 필드
-    @Column(name = "parent_aisn", nullable = false, unique = true)
-    private Long parentAisn;
+    @Column(name = "parent_asin", nullable = false, unique = true)
+    private String parentAsin;
 
     private String title;
 
@@ -31,7 +29,10 @@ public class Product {
     private String mainCategory;
 
     @Column(name = "average_rating")
-    private String averageRating;
+    private BigDecimal averageRating;
+
+    @Column(name = "rating_number")
+    private Integer ratingNumber;
 
     private BigDecimal price;
 
@@ -62,4 +63,19 @@ public class Product {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductVideo> videos = new ArrayList<>();
+
+    @Builder
+    public Product(Long id, String parentAsin, String title, String mainCategory,
+                   BigDecimal averageRating, Integer ratingNumber, BigDecimal price,
+                   String store, String details) {
+        this.id = id;
+        this.parentAsin = parentAsin;
+        this.title = title;
+        this.mainCategory = mainCategory;
+        this.averageRating = averageRating;
+        this.ratingNumber = ratingNumber;
+        this.price = price;
+        this.store = store;
+        this.details = details;
+    }
 }
