@@ -74,10 +74,6 @@ public class DataImportService {
         }
     }
 
-    public java.util.Optional<Product> findByParentAsin(String parentAsin) {
-        return productRepository.findByParentAsin(parentAsin);
-    }
-
     private void addFeatures(JsonNode node, Product product) {
         if (node == null || !node.isArray()) {
             return;

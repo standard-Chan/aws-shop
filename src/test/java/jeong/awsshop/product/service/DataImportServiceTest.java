@@ -28,9 +28,6 @@ class DataImportServiceTest {
     private DataImportService dataImportService;
 
     @Autowired
-    private ProductReadService productReadService;
-
-    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
@@ -101,7 +98,7 @@ class DataImportServiceTest {
         dataImportService.insert(VALID_JSON_LINE);
 
         // Then: 조회 결과가 존재해야 한다
-        assertThat(productReadService.findByParentAsin("B07NTK7T5P")).isPresent();
+        assertThat(productRepository.findByParentAsin("B07NTK7T5P")).isPresent();
     }
 
     @Test
