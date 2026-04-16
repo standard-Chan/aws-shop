@@ -38,6 +38,7 @@ dependencies {
     // --- Unit & Integration Testing (테스트 환경) ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'   // 기본적인 스프링 부트 테스트 지원 (JUnit, Mockito 등)
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'            // IDE나 빌드 도구에서 JUnit을 실행하기 위한 런처
+    testImplementation 'com.h2database:h2' // test환경용 인메모리 db
 
     // --- Test Environment Lombok (테스트 코드 내 사용) ---
     testCompileOnly 'org.projectlombok:lombok'                              // 테스트 코드 내 Lombok 사용 설정
