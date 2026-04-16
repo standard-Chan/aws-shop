@@ -1,21 +1,31 @@
-package jeong.awsshop.product.application;
+package jeong.awsshop.product.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import jeong.awsshop.product.exception.dataImport.DataImportDuplicateParentAsinException;
+import jeong.awsshop.product.repository.ProductBoughtTogetherRepository;
+import jeong.awsshop.product.repository.ProductCategoryRepository;
+import jeong.awsshop.product.repository.ProductDescriptionRepository;
+import jeong.awsshop.product.repository.ProductFeatureRepository;
+import jeong.awsshop.product.repository.ProductImageRepository;
+import jeong.awsshop.product.repository.ProductRepository;
+import jeong.awsshop.product.repository.ProductVideoRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
-class BulkUploadServiceTest {
+@ActiveProfiles("test")
+class DataImportServiceTest {
 
     @Autowired
-    private BulkUploadService bulkUploadService;
+    private DataImportService dataImportService;
 
     @Autowired
     private ProductReadService productReadService;
@@ -68,7 +78,7 @@ class BulkUploadServiceTest {
 
         // When: 한 줄을 insert 한다
         // Then: 저장 과정에서 예외가 없어야 한다
-        assertThatCode(() -> bulkUploadService.insert(VALID_JSON_LINE))
+        assertThatCode(() -> dataImportService.insert(VALID_JSON_LINE))
                 .doesNotThrowAnyException();
 
         // Then: 루트와 child entity가 저장되어야 한다
@@ -88,7 +98,7 @@ class BulkUploadServiceTest {
         // Given: 저장 서비스와 조회 서비스, 그리고 유효한 JSON line
 
         // When: 상품을 insert 하고 parentAsin으로 조회한다
-        bulkUploadService.insert(VALID_JSON_LINE);
+        dataImportService.insert(VALID_JSON_LINE);
 
         // Then: 조회 결과가 존재해야 한다
         assertThat(productReadService.findByParentAsin("B07NTK7T5P")).isPresent();
@@ -101,7 +111,7 @@ class BulkUploadServiceTest {
 
         // When: insert를 수행한다
         // Then: 예외가 발생하지 않아야 한다
-        assertThatCode(() -> bulkUploadService.insert(JSON_WITH_NULL_COLLECTIONS))
+        assertThatCode(() -> dataImportService.insert(JSON_WITH_NULL_COLLECTIONS))
                 .doesNotThrowAnyException();
 
         // Then: child entity는 생성되지 않아야 한다
@@ -122,7 +132,7 @@ class BulkUploadServiceTest {
 
         // When: insert를 수행한다
         // Then: 예외 없이 무시되거나 스킵되어야 한다
-        assertThatCode(() -> bulkUploadService.insert(JSON_WITH_NULL_PARENT_ASIN))
+        assertThatCode(() -> dataImportService.insert(JSON_WITH_NULL_PARENT_ASIN))
                 .doesNotThrowAnyException();
 
         // Then: 저장된 상품이 없어야 한다
@@ -136,7 +146,7 @@ class BulkUploadServiceTest {
 
         // When: insert를 수행한다
         // Then: 예외 없이 무시되거나 스킵되어야 한다
-        assertThatCode(() -> bulkUploadService.insert(JSON_WITH_NULL_TITLE))
+        assertThatCode(() -> dataImportService.insert(JSON_WITH_NULL_TITLE))
                 .doesNotThrowAnyException();
 
         // Then: 저장된 상품이 없어야 한다
@@ -150,7 +160,7 @@ class BulkUploadServiceTest {
 
         // When: insert를 수행한다
         // Then: 파싱 실패가 발생해도 저장은 되지 않아야 한다
-        assertThatCode(() -> bulkUploadService.insert(INVALID_JSON_LINE))
+        assertThatCode(() -> dataImportService.insert(INVALID_JSON_LINE))
                 .doesNotThrowAnyException();
 
         // Then: 저장된 상품이 없어야 한다
@@ -161,12 +171,12 @@ class BulkUploadServiceTest {
     @DisplayName("이미 존재하는 parentAsin이면 에러가 발생해야 한다")
     void should_throw_error_when_parentAsin_is_duplicated() {
         // Given: 먼저 저장된 상품과 동일한 parentAsin을 가진 JSON line
-        bulkUploadService.insert(VALID_JSON_LINE);
+        dataImportService.insert(VALID_JSON_LINE);
 
         // When: 같은 JSON line을 다시 insert 한다
         // Then: 중복 유니크 값 에러가 발생해야 한다
-        assertThatThrownBy(() -> bulkUploadService.insert(VALID_JSON_LINE))
-                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> dataImportService.insert(VALID_JSON_LINE))
+                .isInstanceOf(DataImportDuplicateParentAsinException.class);
 
         // Then: 첫 번째 저장만 유지되어야 한다
         assertThat(productRepository.count()).isEqualTo(1L);
