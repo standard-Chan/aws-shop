@@ -1,4 +1,4 @@
-package jeong.awsshop.product.exception.dataImport;
+package jeong.awsshop.product.exception.dataimport;
 
 public class DataImportRequiredFieldException extends RuntimeException {
 
