@@ -44,5 +44,18 @@ public class ProductBoughtTogether {
         this.relatedProductTitle = relatedProductTitle;
         this.relatedProductImageUrl = relatedProductImageUrl;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductBoughtTogether of(Product product, Long relatedProductId, String relatedProductTitle,
+                                           String relatedProductImageUrl) {
+        return ProductBoughtTogether.builder()
+                .product(product)
+                .relatedProductId(relatedProductId)
+                .relatedProductTitle(relatedProductTitle)
+                .relatedProductImageUrl(relatedProductImageUrl)
+                .build();
+    }
 }
 

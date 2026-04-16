@@ -46,5 +46,15 @@ public class ProductCategory {
         this.product = product;
         this.category = category;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductCategory of(Product product, String category) {
+        return ProductCategory.builder()
+                .product(product)
+                .category(category)
+                .build();
+    }
 }
 

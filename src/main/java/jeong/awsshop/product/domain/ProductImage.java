@@ -58,4 +58,17 @@ public class ProductImage {
         this.large = large;
         this.hiRes = hiRes;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductImage of(Product product, String variant, String thumb, String large, String hiRes) {
+        return ProductImage.builder()
+                .product(product)
+                .variant(variant)
+                .thumb(thumb)
+                .large(large)
+                .hiRes(hiRes)
+                .build();
+    }
 }

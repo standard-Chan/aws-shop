@@ -61,12 +61,7 @@ public class DataImportProductAssembler {
                 index++;
                 continue;
             }
-            ProductFeature productFeature = ProductFeature.builder()
-                    .product(product)
-                    .feature(feature)
-                    .featureIndex(index)
-                    .build();
-            product.addFeature(productFeature);
+            product.addFeature(ProductFeature.of(product, feature, index));
             index++;
         }
     }
@@ -82,12 +77,7 @@ public class DataImportProductAssembler {
                 index++;
                 continue;
             }
-            ProductDescription productDescription = ProductDescription.builder()
-                    .product(product)
-                    .description(description)
-                    .descriptionIndex(index)
-                    .build();
-            product.addDescription(productDescription);
+            product.addDescription(ProductDescription.of(product, description, index));
             index++;
         }
     }
@@ -101,11 +91,7 @@ public class DataImportProductAssembler {
             if (isBlank(category)) {
                 continue;
             }
-            ProductCategory productCategory = ProductCategory.builder()
-                    .product(product)
-                    .category(category)
-                    .build();
-            product.addCategory(productCategory);
+            product.addCategory(ProductCategory.of(product, category));
         }
     }
 
@@ -117,14 +103,12 @@ public class DataImportProductAssembler {
             if (item == null || item.isNull()) {
                 continue;
             }
-            ProductImage productImage = ProductImage.builder()
-                    .product(product)
-                    .variant(text(item.get("variant")))
-                    .thumb(text(item.get("thumb")))
-                    .large(text(item.get("large")))
-                    .hiRes(text(item.get("hi_res")))
-                    .build();
-            product.addImage(productImage);
+            product.addImage(ProductImage.of(
+                    product,
+                    text(item.get("variant")),
+                    text(item.get("thumb")),
+                    text(item.get("large")),
+                    text(item.get("hi_res"))));
         }
     }
 
@@ -136,13 +120,11 @@ public class DataImportProductAssembler {
             if (item == null || item.isNull()) {
                 continue;
             }
-            ProductVideo productVideo = ProductVideo.builder()
-                    .product(product)
-                    .title(text(item.get("title")))
-                    .url(text(item.get("url")))
-                    .userId(normalizeUserId(text(item.get("user_id"))))
-                    .build();
-            product.addVideo(productVideo);
+            product.addVideo(ProductVideo.of(
+                    product,
+                    text(item.get("title")),
+                    text(item.get("url")),
+                    text(item.get("user_id"))));
         }
     }
 
@@ -158,13 +140,11 @@ public class DataImportProductAssembler {
         if (relatedProductId == null) {
             return;
         }
-        ProductBoughtTogether productBoughtTogether = ProductBoughtTogether.builder()
-                .product(product)
-                .relatedProductId(relatedProductId)
-                .relatedProductTitle(text(node.get(DataImportJsonKey.RELATED_PRODUCT_TITLE.value())))
-                .relatedProductImageUrl(text(node.get(DataImportJsonKey.RELATED_PRODUCT_IMAGE_URL.value())))
-                .build();
-        product.addBoughtTogether(productBoughtTogether);
+        product.addBoughtTogether(ProductBoughtTogether.of(
+                product,
+                relatedProductId,
+                text(node.get(DataImportJsonKey.RELATED_PRODUCT_TITLE.value())),
+                text(node.get(DataImportJsonKey.RELATED_PRODUCT_IMAGE_URL.value()))));
     }
 
     private MainCategory mapMainCategory(String value) {
@@ -220,7 +200,4 @@ public class DataImportProductAssembler {
         return node == null || node.isNull() ? null : node.toString();
     }
 
-    private String normalizeUserId(String value) {
-        return isBlank(value) ? null : value;
-    }
 }

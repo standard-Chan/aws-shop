@@ -56,5 +56,16 @@ public class ProductFeature {
         this.feature = feature;
         this.featureIndex = featureIndex;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductFeature of(Product product, String feature, Integer featureIndex) {
+        return ProductFeature.builder()
+                .product(product)
+                .feature(feature)
+                .featureIndex(featureIndex)
+                .build();
+    }
 }
 

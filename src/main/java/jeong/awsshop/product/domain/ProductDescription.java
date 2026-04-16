@@ -53,5 +53,16 @@ public class ProductDescription {
         this.description = description;
         this.descriptionIndex = descriptionIndex;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductDescription of(Product product, String description, Integer descriptionIndex) {
+        return ProductDescription.builder()
+                .product(product)
+                .description(description)
+                .descriptionIndex(descriptionIndex)
+                .build();
+    }
 }
 

@@ -50,4 +50,20 @@ public class ProductVideo {
         this.title = title;
         this.userId = userId;
     }
+
+    /**
+     * 적재 흐름에서 사용할 child 생성 팩토리다.
+     */
+    public static ProductVideo of(Product product, String title, String url, String userId) {
+        return ProductVideo.builder()
+                .product(product)
+                .title(title)
+                .url(url)
+                .userId(normalizeUserId(userId))
+                .build();
+    }
+
+    private static String normalizeUserId(String value) {
+        return value == null || value.trim().isEmpty() ? null : value;
+    }
 }
