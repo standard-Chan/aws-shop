@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import jeong.awsshop.product.exception.dataImport.DataImportDuplicateParentAsinException;
+import jeong.awsshop.product.exception.dataimport.DataImportDuplicateParentAsinException;
 import jeong.awsshop.product.repository.ProductBoughtTogetherRepository;
 import jeong.awsshop.product.repository.ProductCategoryRepository;
 import jeong.awsshop.product.repository.ProductDescriptionRepository;
