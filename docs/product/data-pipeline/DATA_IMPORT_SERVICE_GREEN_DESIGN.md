@@ -1,8 +1,8 @@
-# BulkUploadService GREEN 설계 문서
+# DataImportService GREEN 설계 문서
 
 **작성일**: 2026-04-16  
-**기준 테스트**: [BulkUploadServiceTest.java](/mnt/c/Users/정석찬/Desktop/project/aws-shop/src/test/java/jeong/awsshop/product/application/BulkUploadServiceTest.java)
-**목적**: RED 테스트를 통과하는 최소 구현 방향을 정리한다
+**기준 테스트**: [DataImportServiceTest.java](/mnt/c/Users/정석찬/Desktop/project/aws-shop/src/test/java/jeong/awsshop/product/application/DataImportServiceTest.java)
+**목적**: RED 테스트를 통과하는 최소 적재 구현 방향을 정리한다
 
 ---
 
@@ -22,7 +22,7 @@
 
 ### 2.1 서비스
 
-- `BulkUploadService`
+- `DataImportService`
 
 ### 2.2 공개 메서드
 
@@ -161,22 +161,63 @@
 
 ### 7.4 필수값 누락
 
-- `parent_asin` null이면 저장하지 않는다.
-- `title` null이면 저장하지 않는다.
+- `parent_asin` null이면 `DataImportRequiredFieldException`을 던진다.
+- `title` null이면 `DataImportRequiredFieldException`을 던진다.
 
 ### 7.5 잘못된 JSON
 
-- 파싱 실패 시 저장하지 않는다.
-- 예외를 밖으로 던질지, 내부에서 삼킬지는 테스트가 요구하는 최소 동작에 맞춘다.
+- 파싱 실패 시 `DataImportParsingException`을 던진다.
+- 예외 메시지에는 파싱 실패 원인을 포함한다.
 
 ### 7.6 중복 유니크 값
 
-- `parentAsin`이 이미 존재하면 예외를 반환한다.
+- `parentAsin`이 이미 존재하면 `DataImportDuplicateParentAsinException`을 던진다.
 - 별도 upsert 처리 없이 중복 저장을 막는다.
 
 ---
 
-## 8. 구현 순서
+## 8. 예외 정책
+
+이 서비스는 현재 테스트 범위에서 발생 가능한 예외를 구체적인 타입으로 나눈다.
+
+### 8.1 `DataImportParsingException`
+
+- 발생 시점: JSON line 파싱 실패
+- 원인: 잘못된 JSON 형식, 잘린 문자열, 필드 구문 오류
+- 처리: 저장하지 않고 이 예외를 반환하거나 래핑해 던진다
+- 비고: Jackson 예외를 직접 노출하지 않고 도메인 예외로 감싼다
+
+### 8.2 `DataImportRequiredFieldException`
+
+- 발생 시점: 필수 필드 누락 또는 blank 값
+- 대상 필드: `parent_asin`, `title`
+- 처리: 저장하지 않는다
+- 비고: 예외 메시지에는 누락된 필드명을 포함한다
+
+### 8.3 `DataImportDuplicateParentAsinException`
+
+- 발생 시점: `parentAsin`이 이미 DB에 존재할 때
+- 처리: 저장하지 않고 중복 에러를 반환한다
+- 비고: 현재 RED 테스트의 중복 케이스는 이 예외로 수렴시킨다
+
+### 8.4 `DataImportPersistenceException`
+
+- 발생 시점: DB 저장 중 예상하지 못한 실패
+- 원인: JPA 저장 오류, FK/UNIQUE 제약 위반, 기타 persistence 예외
+- 처리: 저장을 중단하고 이 예외로 래핑한다
+- 비고: 내부적으로는 Spring/JPA 예외를 직접 노출하지 않는다
+
+### 8.5 예외가 아닌 처리
+
+- `main_category` 매핑 실패: 예외 대신 `UNKNOWN`
+- `rating_number` null: 예외 대신 0
+- 배열 필드 null: 예외 대신 빈 컬렉션
+- child 객체 내부 null 값: 예외 대신 스킵
+- `bought_together` null: 예외 없이 스킵
+
+---
+
+## 9. 구현 순서
 
 1. `insert` 메서드 시그니처 작성
 2. JSON 파싱
@@ -189,8 +230,8 @@
 
 ---
 
-## 9. 주의 사항
+## 10. 주의 사항
 
 - `ingest`라는 이름은 사용하지 않는다.
-- 테스트 클래스명은 phase suffix 없이 `BulkUploadServiceTest`로 통일한다.
+- 테스트 클래스명은 phase suffix 없이 `DataImportServiceTest`로 통일한다.
 - 테스트가 요구하지 않는 추가 기능은 넣지 않는다.

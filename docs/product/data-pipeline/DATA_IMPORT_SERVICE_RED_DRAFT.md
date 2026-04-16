@@ -1,7 +1,7 @@
-# BulkUploadService RED 초안
+# DataImportService RED 초안
 
 **작성일**: 2026-04-16  
-**대상**: JSON line 1건을 파싱하고, Product 및 하위 엔티티를 생성한 뒤 FK를 연결하는 단건 insert 서비스
+**대상**: JSON line 1건을 파싱하고, Product 및 하위 엔티티를 생성한 뒤 FK를 연결하는 단건 적재 서비스
 **상태**: 테스트 케이스 초안
 
 ---
