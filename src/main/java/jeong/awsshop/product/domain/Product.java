@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import java.math.BigDecimal;
@@ -19,6 +21,7 @@ import lombok.NoArgsConstructor;
 public class Product {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // 제품의 고유 식별자 역할을 하는 ASIN 필드
@@ -80,5 +83,29 @@ public class Product {
         this.price = price;
         this.store = store;
         this.details = details;
+    }
+
+    public void addFeature(ProductFeature feature) {
+        this.features.add(feature);
+    }
+
+    public void addDescription(ProductDescription description) {
+        this.descriptions.add(description);
+    }
+
+    public void addCategory(ProductCategory category) {
+        this.categories.add(category);
+    }
+
+    public void addBoughtTogether(ProductBoughtTogether boughtTogether) {
+        this.boughtTogether.add(boughtTogether);
+    }
+
+    public void addImage(ProductImage image) {
+        this.images.add(image);
+    }
+
+    public void addVideo(ProductVideo video) {
+        this.videos.add(video);
     }
 }
