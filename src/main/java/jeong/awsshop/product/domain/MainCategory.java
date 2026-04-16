@@ -35,5 +35,19 @@ public enum MainCategory {
     TOOLS_AND_HOME_IMPROVEMENT,
     TOYS_AND_GAMES,
     VIDEO_GAMES,
-    UNKNOWN
+    UNKNOWN;
+
+    public static MainCategory fromDisplayName(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return UNKNOWN;
+        }
+
+        String normalized = value.trim().replaceAll("\\s+", " ").toUpperCase().replace(' ', '_');
+        for (MainCategory category : values()) {
+            if (category != UNKNOWN && category.name().equals(normalized)) {
+                return category;
+            }
+        }
+        return UNKNOWN;
+    }
 }
