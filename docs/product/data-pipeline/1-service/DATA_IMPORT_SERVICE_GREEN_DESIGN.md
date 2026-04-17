@@ -1,7 +1,7 @@
 # DataImportService GREEN 설계 문서
 
 **작성일**: 2026-04-16  
-**기준 테스트**: [DataImportServiceTest.java](/mnt/c/Users/정석찬/Desktop/project/aws-shop/src/test/java/jeong/awsshop/product/application/DataImportServiceTest.java)
+**기준 테스트**: [DataImportServiceTest.java](/mnt/c/Users/정석찬/Desktop/project/aws-shop/src/test/java/jeong/awsshop/product/service/DataImportServiceTest.java)
 **목적**: RED 테스트를 통과하는 최소 적재 구현 방향을 정리한다
 
 ---
