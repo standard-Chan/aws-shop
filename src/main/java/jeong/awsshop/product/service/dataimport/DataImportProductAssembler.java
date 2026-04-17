@@ -15,6 +15,7 @@ import jeong.awsshop.product.domain.ProductDescription;
 import jeong.awsshop.product.domain.ProductFeature;
 import jeong.awsshop.product.domain.ProductImage;
 import jeong.awsshop.product.domain.ProductVideo;
+import jeong.awsshop.product.service.dataimport.dto.DataImportProduct;
 import org.springframework.stereotype.Component;
 
 /**

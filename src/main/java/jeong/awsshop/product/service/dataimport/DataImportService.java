@@ -1,10 +1,9 @@
-package jeong.awsshop.product.service;
+package jeong.awsshop.product.service.dataimport;
 
 import jeong.awsshop.product.exception.dataimport.DataImportDuplicateParentAsinException;
 import jeong.awsshop.product.exception.dataimport.DataImportPersistenceException;
 import jeong.awsshop.product.repository.ProductRepository;
-import jeong.awsshop.product.service.dataimport.DataImportProduct;
-import jeong.awsshop.product.service.dataimport.DataImportProductAssembler;
+import jeong.awsshop.product.service.dataimport.dto.DataImportProduct;
 import jeong.awsshop.common.exception.JsonParsingException;
 import jeong.awsshop.common.json.JsonTreeParser;
 import org.springframework.stereotype.Service;
