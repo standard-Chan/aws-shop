@@ -1,4 +1,4 @@
-package jeong.awsshop.common.json;
+package jeong.awsshop.common.exception;
 
 public class JsonParsingException extends RuntimeException {
 

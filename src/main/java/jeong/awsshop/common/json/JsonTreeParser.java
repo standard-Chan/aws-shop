@@ -3,6 +3,7 @@ package jeong.awsshop.common.json;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jeong.awsshop.common.exception.JsonParsingException;
 import org.springframework.stereotype.Component;
 
 /**

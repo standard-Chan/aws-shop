@@ -5,7 +5,7 @@ import jeong.awsshop.product.exception.dataimport.DataImportPersistenceException
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.service.dataimport.DataImportProduct;
 import jeong.awsshop.product.service.dataimport.DataImportProductAssembler;
-import jeong.awsshop.common.json.JsonParsingException;
+import jeong.awsshop.common.exception.JsonParsingException;
 import jeong.awsshop.common.json.JsonTreeParser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
