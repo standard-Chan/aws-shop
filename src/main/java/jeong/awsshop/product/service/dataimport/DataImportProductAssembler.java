@@ -1,7 +1,12 @@
 package jeong.awsshop.product.service.dataimport;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.math.BigDecimal;
+import static jeong.awsshop.common.json.JsonNodeValues.decimal;
+import static jeong.awsshop.common.json.JsonNodeValues.details;
+import static jeong.awsshop.common.json.JsonNodeValues.integer;
+import static jeong.awsshop.common.json.JsonNodeValues.isBlank;
+import static jeong.awsshop.common.json.JsonNodeValues.longValue;
+import static jeong.awsshop.common.json.JsonNodeValues.text;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.domain.Product;
 import jeong.awsshop.product.domain.ProductBoughtTogether;
@@ -23,8 +28,8 @@ public class DataImportProductAssembler {
      * 필수값이 없으면 null을 반환한다.
      */
     public DataImportProduct assemble(JsonNode rootNode) {
-        String parentAsin = text(rootNode, DataImportJsonKey.PARENT_ASIN);
-        String title = text(rootNode, DataImportJsonKey.TITLE);
+        String parentAsin = fieldText(rootNode, DataImportJsonKey.PARENT_ASIN);
+        String title = fieldText(rootNode, DataImportJsonKey.TITLE);
         if (isBlank(parentAsin) || isBlank(title)) {
             return null;
         }
@@ -32,11 +37,11 @@ public class DataImportProductAssembler {
         Product product = Product.builder()
                 .parentAsin(parentAsin)
                 .title(title)
-                .mainCategory(mapMainCategory(text(rootNode, DataImportJsonKey.MAIN_CATEGORY)))
+                .mainCategory(mapMainCategory(fieldText(rootNode, DataImportJsonKey.MAIN_CATEGORY)))
                 .averageRating(decimal(rootNode.get(DataImportJsonKey.AVERAGE_RATING.value())))
                 .ratingNumber(integer(rootNode.get(DataImportJsonKey.RATING_NUMBER.value())))
                 .price(decimal(rootNode.get(DataImportJsonKey.PRICE.value())))
-                .store(text(rootNode, DataImportJsonKey.STORE))
+                .store(fieldText(rootNode, DataImportJsonKey.STORE))
                 .details(details(rootNode.get(DataImportJsonKey.DETAILS.value())))
                 .build();
 
@@ -151,53 +156,8 @@ public class DataImportProductAssembler {
         return MainCategory.fromDisplayName(value);
     }
 
-    private String text(JsonNode node) {
-        return node == null || node.isNull() ? null : node.asText();
-    }
-
-    private String text(JsonNode rootNode, DataImportJsonKey fieldName) {
+    private String fieldText(JsonNode rootNode, DataImportJsonKey fieldName) {
         return rootNode == null ? null : text(rootNode.get(fieldName.value()));
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
-
-    private BigDecimal decimal(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        try {
-            return node.decimalValue();
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    private Integer integer(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return 0;
-        }
-        try {
-            return Math.max(node.intValue(), 0);
-        } catch (RuntimeException e) {
-            return 0;
-        }
-    }
-
-    private Long longValue(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        try {
-            return node.longValue();
-        } catch (RuntimeException e) {
-            return null;
-        }
-    }
-
-    private String details(JsonNode node) {
-        return node == null || node.isNull() ? null : node.toString();
     }
 
 }

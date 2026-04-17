@@ -2,11 +2,11 @@ package jeong.awsshop.product.service;
 
 import jeong.awsshop.product.exception.dataimport.DataImportDuplicateParentAsinException;
 import jeong.awsshop.product.exception.dataimport.DataImportPersistenceException;
-import jeong.awsshop.product.exception.dataimport.DataImportParsingException;
 import jeong.awsshop.product.repository.ProductRepository;
-import jeong.awsshop.product.service.dataimport.DataImportJsonParser;
 import jeong.awsshop.product.service.dataimport.DataImportProduct;
 import jeong.awsshop.product.service.dataimport.DataImportProductAssembler;
+import jeong.awsshop.common.json.JsonParsingException;
+import jeong.awsshop.common.json.JsonTreeParser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,11 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DataImportService {
 
-    private final DataImportJsonParser jsonParser;
+    private final JsonTreeParser jsonParser;
     private final DataImportProductAssembler productAssembler;
     private final ProductRepository productRepository;
 
-    public DataImportService(DataImportJsonParser jsonParser, DataImportProductAssembler productAssembler,
+    public DataImportService(JsonTreeParser jsonParser, DataImportProductAssembler productAssembler,
                              ProductRepository productRepository) {
         this.jsonParser = jsonParser;
         this.productAssembler = productAssembler;
@@ -32,7 +32,7 @@ public class DataImportService {
         DataImportProduct dataImportProduct;
         try {
             dataImportProduct = productAssembler.assemble(jsonParser.parse(jsonLine));
-        } catch (DataImportParsingException e) {
+        } catch (JsonParsingException e) {
             return;
         }
 

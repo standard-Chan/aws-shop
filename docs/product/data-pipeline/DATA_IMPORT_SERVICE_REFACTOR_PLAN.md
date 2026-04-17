@@ -166,6 +166,8 @@
 - field extraction
 - child data mapping
 
+JSON line 파싱은 이제 공용 `common/json` 계층의 `JsonTreeParser`가 담당한다.
+
 ### 3.2 상수 분리
 
 입력 key, 예외 메시지, 특수 문자열을 상수로 분리한다.
@@ -197,9 +199,41 @@
 - 파싱 결과를 도메인 생성 로직에 전달
 - 저장 호출
 
+### 3.5 단순 변환 함수 분리 예정
+
+`DataImportProductAssembler` 안에는 여전히 단순한 변환 헬퍼가 남아 있다.
+
+- `decimal(...)`
+- `integer(...)`
+- `longValue(...)`
+- `details(...)`
+- `text(...)`
+- `isBlank(...)`
+
+이 함수들은 도메인 생성 규칙이라기보다, JSON 읽기와 기본값 처리에 가까우므로 `common/json` 하위의 공용 변환 도구로 분리하는 것을 다음 단계로 둔다.
+
+분리 기준은 다음과 같다.
+
+- 데이터 변환 규칙이 재사용 가능해야 한다.
+- entity 생성 책임과 무관해야 한다.
+- assembler 안에서 직접적인 도메인 의미를 가지지 않아야 한다.
+
 ---
 
-## 4. 변경하지 말아야 할 것
+## 4. 진행 체크리스트
+
+- [x] JSON 파싱 책임을 `common/json`의 `JsonTreeParser`로 분리했다.
+- [x] `DataImportJsonKey`를 `service/dataimport` 패키지로 이동했다.
+- [x] `DataImportService`는 orchestration만 담당하도록 줄였다.
+- [x] `ProductFeature`, `ProductDescription`, `ProductCategory`, `ProductImage`, `ProductVideo`, `ProductBoughtTogether`에 자기 생성 팩토리를 추가했다.
+- [x] child entity 생성 책임을 `Product` 외부에서 각 엔티티 쪽으로 옮겼다.
+- [x] `DataImportProductAssembler`는 JSON 해석과 팩토리 호출만 담당하도록 정리했다.
+- [x] `DataImportProductAssembler`의 단순 변환 함수(`decimal`, `integer`, `longValue`, `details`, `text`, `isBlank`)를 `common/json`의 `JsonNodeValues`로 분리했다.
+- [ ] `JsonNodeValues`를 다른 JSON 적재 도메인에도 실제 적용한다.
+
+---
+
+## 5. 변경하지 말아야 할 것
 
 - 테스트 코드는 수정하지 않는다.
 - 현재 GREEN 동작은 바꾸지 않는다.
@@ -208,9 +242,9 @@
 
 ---
 
-## 5. 다음 변경 제안
+## 6. 다음 변경 제안
 
-1. JSON key 상수화
-2. 파서 클래스 분리
-3. child 생성 로직 분리
-4. 서비스에서 반복 메서드 제거
+1. `JsonNodeValues`의 적용 범위를 다른 JSON 적재 도메인으로 확장
+2. JSON key 상수화 범위 점검
+3. 필요 시 assembler 내부 중복 제거
+4. 서비스 레이어 추가 정리
