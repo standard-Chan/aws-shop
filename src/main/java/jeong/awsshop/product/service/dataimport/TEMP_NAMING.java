@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 @AllArgsConstructor
-public class bulkInsertService {
+public class TEMP_NAMING {
 
     private final ObjectMapper objectMapper;
     private final BulkInsertRepository bulkInsertRepository;
