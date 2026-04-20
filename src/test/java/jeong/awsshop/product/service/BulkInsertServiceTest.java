@@ -12,7 +12,7 @@ import jeong.awsshop.product.repository.ProductFeatureRepository;
 import jeong.awsshop.product.repository.ProductImageRepository;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.ProductVideoRepository;
-import jeong.awsshop.product.service.dataimport.TEMP_NAMING;
+import jeong.awsshop.product.service.dataimport.BulkInsertService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 class BulkInsertServiceTest {
 
     @Autowired
-    private TEMP_NAMING bulkInsertService;
+    private BulkInsertService bulkInsertService;
 
     @Autowired
     private ProductRepository productRepository;
