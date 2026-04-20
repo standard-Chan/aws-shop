@@ -44,7 +44,7 @@ public class ProductFeature {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String feature;
 
     @Column

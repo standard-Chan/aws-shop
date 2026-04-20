@@ -24,7 +24,7 @@ public record ProductDto(
         @JsonProperty("videos") List<ProductVideoDto> videos,
         @JsonProperty("store") String store,
         @JsonProperty("categories") List<String> categories,
-        @JsonProperty("details") Map<String, String> details,
+        @JsonProperty("details") Map<String, Object> details,
         @JsonProperty("parent_asin") String parentAsin,
         @JsonProperty("bought_together") BoughtTogetherDto boughtTogether
 ) {
@@ -49,7 +49,7 @@ public record ProductDto(
         return categories == null ? List.of() : categories;
     }
 
-    public Map<String, String> detailsOrEmpty() {
+    public Map<String, Object> detailsOrEmpty() {
         return details == null ? Map.of() : details;
     }
 
