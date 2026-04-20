@@ -4,23 +4,29 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.service.dataimport.dto.ProductDto;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @AllArgsConstructor
+@Slf4j
 public class BulkInsertRepository {
 
     private final DataSource dataSource;
     private final ObjectMapper objectMapper;
     private final SnowflakeIdGenerator idGenerator = new SnowflakeIdGenerator();
 
-    public void bulkInsert(List<ProductDto> dtos) {
+    public List<ProductDto> bulkInsert(List<ProductDto> dtos) {
 
         String productSql = """
             INSERT INTO product (
@@ -152,10 +158,28 @@ public class BulkInsertRepository {
                 throw e;
             }
 
+        } catch (SQLException e) {
+            // MySQL 중복키 등 제약조건 위반
+            if (e instanceof SQLIntegrityConstraintViolationException
+                || e.getErrorCode() == 1062) {
+                log.info("[Bulk Insert] 유니크 키가 중복되어 insert 를 skip합니다.");
+                return new ArrayList<>();
+            }
+            else {
+                log.error("[Bulk Insert] SQL isnert 예외가 발생하였습니다", e);
+                // 예외 발생 시, 해당 batch 를 반환하여 저장할 수 있도록 한다.
+                return dtos;
+            }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("[Bulk Insert] bulk insert 중, 예상하지 못한 에러가 발생하였습니다.", e);
+            // 예외 발생 시, 해당 batch 를 반환하여 저장할 수 있도록 한다.
+            return dtos;
         }
+
+        // 성공 시, 빈 배열 반환
+        return new ArrayList<>();
     }
+
 
     private void executeAll(PreparedStatement... statements) throws Exception {
         for (PreparedStatement ps : statements) {
