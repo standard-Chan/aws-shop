@@ -1,14 +1,13 @@
-package jeong.awsshop.product.repository;
+package jeong.awsshop.product.repository.findproductsummaries;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayInputStream;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import jeong.awsshop.product.domain.MainCategory;
+import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.dataimport.BulkInsertService;
 import org.junit.jupiter.api.BeforeAll;
@@ -24,7 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ProductRepositoryFindCategoryProductSummariesTest {
+class ProductRepositoryFindProductSummariesTest {
 
     @Autowired
     private BulkInsertService bulkInsertService;
@@ -55,138 +54,97 @@ class ProductRepositoryFindCategoryProductSummariesTest {
     }
 
     @Test
-    @DisplayName("category 조건에 맞는 상품만 조회해야 한다")
-    void should_find_products_by_category_when_category_exists() {
-        // Given: Handmade와 Gift Cards fixture가 함께 저장되어 있다
+    @DisplayName("cursor가 없으면 id ASC 순서로 상품을 조회해야 한다")
+    void should_find_products_ordered_by_id_asc_when_cursor_is_null() {
+        // Given: 저장된 fixture 데이터
 
-        // When: Handmade category만 조회한다
+        // When: cursor 없이 충분한 limit으로 조회한다
         List<ProductSummaryNativeProjection> rows =
-                productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        null,
-                        null,
-                        20
-                );
+                productRepository.findProductSummaries(null, 20);
 
-        // Then: 모든 row는 Handmade category여야 한다
+        // Then: 조회 결과는 id 오름차순이어야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getId)
+                .isSorted();
+    }
+
+    @Test
+    @DisplayName("cursor가 있으면 cursor보다 큰 id의 상품만 조회해야 한다")
+    void should_find_products_after_cursor_when_cursor_exists() {
+        // Given: 저장된 상품 중 두 번째 상품 id를 cursor로 선택한다
+        List<ProductSummaryNativeProjection> allRows =
+                productRepository.findProductSummaries(null, 20);
+        Long cursor = allRows.get(1).getId();
+
+        // When: cursor 이후 상품을 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findProductSummaries(cursor, 20);
+
+        // Then: 모든 결과는 cursor보다 큰 id를 가져야 한다
         assertThat(rows).isNotEmpty();
         assertThat(rows).allSatisfy(row ->
-                assertThat(row.getMainCategory()).isEqualTo("HANDMADE_PRODUCTS")
+                assertThat(row.getId()).isGreaterThan(cursor)
         );
     }
 
     @Test
-    @DisplayName("averageRating 첫 페이지는 average_rating DESC, id ASC로 조회해야 한다")
-    void should_find_products_ordered_by_average_rating_desc_and_id_asc_when_cursor_is_null() {
-        // Given: 같은 category 안에 서로 다른 averageRating과 같은 averageRating 상품이 있다
+    @DisplayName("MAIN 이미지가 있으면 대표 image로 MAIN을 반환해야 한다")
+    void should_select_main_image_when_main_image_exists() {
+        // Given: MAIN과 PT01 이미지를 모두 가진 상품
 
-        // When: averageRating 기준 첫 페이지를 조회한다
-        List<ProductSummaryNativeProjection> rows =
-                productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        null,
-                        null,
-                        20
-                );
+        // When: 상품 목록을 조회한다
+        ProductSummaryNativeProjection row = findByParentAsin("RED_GIFT_CARD");
 
-        // Then: averageRating은 내림차순이어야 한다
-        assertThat(rows).extracting(ProductSummaryNativeProjection::getAverageRating)
-                .isSortedAccordingTo((left, right) -> right.compareTo(left));
-
-        // Then: 같은 averageRating 4.0 상품은 id 오름차순이어야 한다
-        assertThat(rows.stream()
-                .filter(row -> row.getAverageRating().compareTo(new BigDecimal("4.0")) == 0)
-                .map(ProductSummaryNativeProjection::getId)
-                .toList()).isSorted();
+        // Then: 대표 이미지는 MAIN이어야 한다
+        assertThat(row.getImageVariant()).isEqualTo("MAIN");
+        assertThat(row.getImageThumb()).isEqualTo("gift-main-thumb");
+        assertThat(row.getImageLarge()).isEqualTo("gift-main-large");
+        assertThat(row.getImageHiRes()).isEqualTo("gift-main-hires");
     }
 
     @Test
-    @DisplayName("averageRating cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
-    void should_find_next_products_by_average_rating_cursor_when_cursor_exists() {
-        // Given: averageRating 첫 페이지에서 두 번째 row를 cursor로 선택한다
-        List<ProductSummaryNativeProjection> firstPage =
-                productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        null,
-                        null,
-                        20
-                );
-        ProductSummaryNativeProjection cursor = firstPage.get(1);
+    @DisplayName("MAIN 이미지가 없으면 ProductImage id ASC 기준 첫 번째 이미지를 반환해야 한다")
+    void should_select_first_image_by_id_when_main_image_does_not_exist() {
+        // Given: PT01, PT02만 가진 상품. 먼저 저장된 PT01이 대표 이미지가 되어야 한다
 
-        // When: cursor 이후 averageRating 페이지를 조회한다
-        List<ProductSummaryNativeProjection> rows =
-                productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        cursor.getId(),
-                        cursor.getAverageRating(),
-                        20
-                );
+        // When: 상품 목록을 조회한다
+        ProductSummaryNativeProjection row = findByParentAsin("RED_NO_MAIN");
 
-        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다
-        assertThat(rows).isNotEmpty();
-        assertThat(rows).allSatisfy(row -> {
-            boolean lowerRating = row.getAverageRating().compareTo(cursor.getAverageRating()) < 0;
-            boolean sameRatingAndGreaterId = row.getAverageRating().compareTo(cursor.getAverageRating()) == 0
-                    && row.getId() > cursor.getId();
-            assertThat(lowerRating || sameRatingAndGreaterId).isTrue();
-        });
+        // Then: MAIN이 없으면 첫 번째 저장 이미지인 PT01을 반환해야 한다
+        assertThat(row.getImageVariant()).isEqualTo("PT01");
+        assertThat(row.getImageThumb()).isEqualTo("no-main-first-thumb");
+        assertThat(row.getImageLarge()).isEqualTo("no-main-first-large");
+        assertThat(row.getImageHiRes()).isEqualTo("no-main-first-hires");
     }
 
     @Test
-    @DisplayName("ratingNumber 첫 페이지는 rating_number DESC, id ASC로 조회해야 한다")
-    void should_find_products_ordered_by_rating_number_desc_and_id_asc_when_cursor_is_null() {
-        // Given: 같은 category 안에 서로 다른 ratingNumber와 같은 ratingNumber 상품이 있다
+    @DisplayName("이미지가 없어도 Product는 조회되고 image 필드는 null이어야 한다")
+    void should_return_product_with_null_image_when_product_has_no_image() {
+        // Given: images가 빈 배열인 상품
 
-        // When: ratingNumber 기준 첫 페이지를 조회한다
-        List<ProductSummaryNativeProjection> rows =
-                productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        null,
-                        null,
-                        20
-                );
+        // When: 상품 목록을 조회한다
+        ProductSummaryNativeProjection row = findByParentAsin("RED_NO_IMAGE");
 
-        // Then: ratingNumber는 내림차순이어야 한다
-        assertThat(rows).extracting(ProductSummaryNativeProjection::getRatingNumber)
-                .isSortedAccordingTo((left, right) -> right.compareTo(left));
-
-        // Then: 같은 ratingNumber 10 상품은 id 오름차순이어야 한다
-        assertThat(rows.stream()
-                .filter(row -> row.getRatingNumber().equals(10))
-                .map(ProductSummaryNativeProjection::getId)
-                .toList()).isSorted();
+        // Then: LEFT JOIN 결과로 상품은 유지되고 image 값만 null이어야 한다
+        assertThat(row.getTitle()).isEqualTo("No Image Product");
+        assertThat(row.getImageVariant()).isNull();
+        assertThat(row.getImageThumb()).isNull();
+        assertThat(row.getImageLarge()).isNull();
+        assertThat(row.getImageHiRes()).isNull();
     }
 
     @Test
-    @DisplayName("ratingNumber cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
-    void should_find_next_products_by_rating_number_cursor_when_cursor_exists() {
-        // Given: ratingNumber 첫 페이지에서 두 번째 row를 cursor로 선택한다
-        List<ProductSummaryNativeProjection> firstPage =
-                productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        null,
-                        null,
-                        20
-                );
-        ProductSummaryNativeProjection cursor = firstPage.get(1);
+    @DisplayName("이미지가 여러 개여도 Product row는 1개만 반환되어야 한다")
+    void should_return_only_one_representative_image_per_product_when_product_has_multiple_images() {
+        // Given: 여러 이미지를 가진 상품
 
-        // When: cursor 이후 ratingNumber 페이지를 조회한다
+        // When: 상품 목록을 조회한다
         List<ProductSummaryNativeProjection> rows =
-                productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE_PRODUCTS,
-                        cursor.getId(),
-                        cursor.getRatingNumber(),
-                        20
-                );
+                productRepository.findProductSummaries(null, 20);
 
-        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다
-        assertThat(rows).isNotEmpty();
-        assertThat(rows).allSatisfy(row -> {
-            boolean lowerRatingNumber = row.getRatingNumber() < cursor.getRatingNumber();
-            boolean sameRatingNumberAndGreaterId = row.getRatingNumber().equals(cursor.getRatingNumber())
-                    && row.getId() > cursor.getId();
-            assertThat(lowerRatingNumber || sameRatingNumberAndGreaterId).isTrue();
-        });
+        // Then: 같은 parentAsin의 Product row는 하나만 있어야 한다
+        assertThat(rows)
+                .filteredOn(row -> row.getParentAsin().equals("RED_GIFT_CARD"))
+                .hasSize(1);
     }
 
     private ProductSummaryNativeProjection findByParentAsin(String parentAsin) {

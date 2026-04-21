@@ -1,4 +1,4 @@
-package jeong.awsshop.product.service.productread;
+package jeong.awsshop.product.service.productread.getproducts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,6 +11,7 @@ import java.util.List;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
+import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
 import jeong.awsshop.product.service.productread.dto.ProductSummaryResponse;
@@ -179,7 +180,7 @@ class ProductReadServiceGetProductsTest {
         assertThat(product.id()).isEqualTo(101L);
         assertThat(product.parentAsin()).isEqualTo("A-001");
         assertThat(product.title()).isEqualTo("Product A");
-        assertThat(product.mainCategory()).isEqualTo(MainCategory.HANDMADE_PRODUCTS);
+        assertThat(product.mainCategory()).isEqualTo(MainCategory.HANDMADE);
         assertThat(product.averageRating()).isEqualByComparingTo("4.5");
         assertThat(product.ratingNumber()).isEqualTo(12);
         assertThat(product.price()).isEqualByComparingTo("19.99");
@@ -224,7 +225,7 @@ class ProductReadServiceGetProductsTest {
             public Long getId() { return id; }
             public String getParentAsin() { return parentAsin; }
             public String getTitle() { return title; }
-            public String getMainCategory() { return "HANDMADE_PRODUCTS"; }
+            public String getMainCategory() { return "HANDMADE"; }
             public BigDecimal getAverageRating() { return new BigDecimal("4.5"); }
             public Integer getRatingNumber() { return 12; }
             public BigDecimal getPrice() { return new BigDecimal("19.99"); }
@@ -241,7 +242,7 @@ class ProductReadServiceGetProductsTest {
             public Long getId() { return id; }
             public String getParentAsin() { return parentAsin; }
             public String getTitle() { return title; }
-            public String getMainCategory() { return "HANDMADE_PRODUCTS"; }
+            public String getMainCategory() { return "HANDMADE"; }
             public BigDecimal getAverageRating() { return new BigDecimal("4.5"); }
             public Integer getRatingNumber() { return 12; }
             public BigDecimal getPrice() { return new BigDecimal("19.99"); }
