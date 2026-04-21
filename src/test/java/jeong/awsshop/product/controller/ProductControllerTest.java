@@ -96,4 +96,28 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.nextCursorId").value(101L))
                 .andExpect(jsonPath("$.hasNext").value(true));
     }
+
+    @Test
+    @DisplayName("size가 0 이하이면 400 Bad Request를 반환해야 한다")
+    void should_return_bad_request_when_size_is_negative() throws Exception {
+        // Given: 유효하지 않은 size 값
+
+        // When & Then: size가 0이면 요청을 거절해야 한다
+        mockMvc.perform(get("/api/products").param("size", "0"))
+                .andExpect(status().isBadRequest());
+
+        // When & Then: size가 음수이면 요청을 거절해야 한다
+        mockMvc.perform(get("/api/products").param("size", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size가 최대값 100보다 크면 400 Bad Request를 반환해야 한다")
+    void should_return_bad_request_when_size_is_greater_than_max() throws Exception {
+        // Given: 최대 size를 초과한 요청
+
+        // When & Then: size 101은 요청을 거절해야 한다
+        mockMvc.perform(get("/api/products").param("size", "101"))
+                .andExpect(status().isBadRequest());
+    }
 }
