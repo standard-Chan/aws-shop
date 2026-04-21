@@ -1,0 +1,29 @@
+### category 기본 조회 - averageRating 기본 정렬
+
+GET http://localhost:8080/api/products/category?mainCategory=SUBSCRIPTION_boxes&size=20
+Accept: application/json
+
+### category 조회 - averageRating 정렬
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&averageRating=true
+Accept: application/json
+
+### category 조회 - averageRating cursor 기반 다음 페이지
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&averageRating=true&cursorId=321689502437347350&cursorAverageRating=4.5
+Accept: application/json
+
+### category 조회 - ratingNumber 정렬
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&ratingNumber=true
+Accept: application/json
+
+### category 조회 - ratingNumber cursor 기반 다음 페이지
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&ratingNumber=true&cursorId=321689502437347350&cursorRatingNumber=12
+Accept: application/json
+
+### category 조회 - 하이픈 연결 query param
+
+GET http://localhost:8080/api/products/category?mainCategory=Gift-Cards&size=20&averageRating=true
+Accept: application/json
