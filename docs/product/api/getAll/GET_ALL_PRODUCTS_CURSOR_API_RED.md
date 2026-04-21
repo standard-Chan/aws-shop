@@ -149,7 +149,7 @@ RED 의도:
 - `ProductSummaryResponse`
 - `ProductImageResponse`
 - `ProductSummaryNativeProjection`
-- `findProductSummariesWithRepresentativeImage`
+- `findProductSummaries`
 
 위 클래스와 메서드는 현재 구현되지 않았거나 불완전할 수 있으므로 테스트는 컴파일 실패 또는 실패 상태가 될 수 있다.
 
