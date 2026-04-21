@@ -1,4 +1,4 @@
-package jeong.awsshop.product.service;
+package jeong.awsshop.product.service.dataimport;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,17 +12,18 @@ import jeong.awsshop.product.repository.ProductFeatureRepository;
 import jeong.awsshop.product.repository.ProductImageRepository;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.ProductVideoRepository;
-import jeong.awsshop.product.service.dataimport.BulkInsertService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BulkInsertServiceTest {
 
     @Autowired

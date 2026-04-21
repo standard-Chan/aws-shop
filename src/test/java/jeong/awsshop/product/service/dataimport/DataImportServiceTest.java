@@ -1,4 +1,4 @@
-package jeong.awsshop.product.service;
+package jeong.awsshop.product.service.dataimport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,7 +12,7 @@ import jeong.awsshop.product.repository.ProductFeatureRepository;
 import jeong.awsshop.product.repository.ProductImageRepository;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.ProductVideoRepository;
-import jeong.awsshop.product.service.dataimport.DataImportService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +68,11 @@ class DataImportServiceTest {
     private static final String INVALID_JSON_LINE = """
         {"main_category":"Handmade","title":"Broken Json"
         """;
+
+    @AfterEach
+    void cleanup() {
+        productRepository.deleteAll();
+    }
 
     @Test
     @DisplayName("JSONL 한 줄이 유효하면 상품과 자식 엔티티가 저장되어야 한다")
