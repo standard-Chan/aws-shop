@@ -52,3 +52,13 @@ tasks.named('test') {
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8' // 컴파일 시 UTF-8 인코딩 설정
 }
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        // 테스트 실패 시 상세 내역 출력
+        events "failed"
+        // 예외 메시지(Exception Message) 출력
+        exceptionFormat "full"
+    }
+}
