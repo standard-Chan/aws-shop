@@ -17,7 +17,7 @@ public enum MainCategory {
     ELECTRONICS,
     GIFT_CARDS,
     GROCERY_AND_GOURMET_FOOD,
-    HANDMADE_PRODUCTS,
+    HANDMADE,
     HEALTH_AND_HOUSEHOLD,
     HEALTH_AND_PERSONAL_CARE,
     HOME_AND_KITCHEN,
@@ -43,11 +43,22 @@ public enum MainCategory {
         }
 
         String normalized = value.trim().replaceAll("\\s+", " ").toUpperCase().replace(' ', '_');
+
         for (MainCategory category : values()) {
             if (category != UNKNOWN && category.name().equals(normalized)) {
                 return category;
             }
         }
         return UNKNOWN;
+    }
+
+    /**
+     * query parameter의 category 문자열을 enum으로 변환한다.
+     */
+    public static MainCategory fromQueryParam(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return UNKNOWN;
+        }
+        return fromDisplayName(value.replace('-', ' '));
     }
 }
