@@ -1,0 +1,19 @@
+### 기본 조회 (cursor 없음)
+
+GET http://localhost:8080/api/products?size=5
+Accept: application/json
+
+### cursor 기반 조회 (예: cursor=id)
+
+GET http://localhost:8080/api/products?size=3&cursor=321689502387015680
+Accept: application/json
+
+### size만 변경
+
+GET http://localhost:8080/api/products?size=5
+Accept: application/json
+
+### cursor + 작은 size
+
+GET http://localhost:8080/api/products?size=5&cursor=10
+Accept: application/json
