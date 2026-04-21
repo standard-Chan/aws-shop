@@ -1,7 +1,6 @@
 package jeong.awsshop.product.service.productread;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
@@ -13,7 +12,7 @@ import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
-import jeong.awsshop.product.service.productread.dto.ProductSummaryNativeProjection;
+import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.dto.ProductSummaryResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class ProductReadServiceTest {
@@ -219,33 +217,6 @@ class ProductReadServiceTest {
 
         // Then: image는 null이어야 한다
         assertThat(response.products().getFirst().image()).isNull();
-    }
-
-    @Test
-    @DisplayName("size가 0 이하이면 상품 목록 조회를 거절해야 한다")
-    void should_throw_bad_request_when_size_is_not_positive() {
-        // Given: 유효하지 않은 size 값
-
-        // When & Then: size가 0이면 400 예외를 던져야 한다
-        assertThatThrownBy(() -> productReadService.getProducts(0, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400 BAD_REQUEST");
-
-        // When & Then: size가 음수이면 400 예외를 던져야 한다
-        assertThatThrownBy(() -> productReadService.getProducts(-1, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400 BAD_REQUEST");
-    }
-
-    @Test
-    @DisplayName("size가 100보다 크면 상품 목록 조회를 거절해야 한다")
-    void should_throw_bad_request_when_size_is_greater_than_max() {
-        // Given: 최대값을 초과한 size
-
-        // When & Then: size 101은 400 예외를 던져야 한다
-        assertThatThrownBy(() -> productReadService.getProducts(101, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("400 BAD_REQUEST");
     }
 
     private ProductSummaryNativeProjection projection(Long id, String parentAsin, String title) {

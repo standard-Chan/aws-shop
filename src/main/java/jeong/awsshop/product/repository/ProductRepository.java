@@ -3,7 +3,7 @@ package jeong.awsshop.product.repository;
 import java.util.List;
 import java.util.Optional;
 import jeong.awsshop.product.domain.Product;
-import jeong.awsshop.product.service.productread.dto.ProductSummaryNativeProjection;
+import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

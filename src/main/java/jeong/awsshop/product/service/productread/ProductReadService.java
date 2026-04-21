@@ -5,13 +5,11 @@ import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
-import jeong.awsshop.product.service.productread.dto.ProductSummaryNativeProjection;
+import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.dto.ProductSummaryResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -24,8 +22,6 @@ public class ProductReadService {
      */
     @Transactional(readOnly = true)
     public ProductCursorResponse getProducts(int size, Long cursor) {
-        validateSize(size);
-
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findProductSummaries(cursor, size + 1);
 
@@ -38,15 +34,6 @@ public class ProductReadService {
         Long nextCursorId = products.isEmpty() ? null : products.getLast().id();
 
         return new ProductCursorResponse(products, nextCursorId, hasNext);
-    }
-
-    private void validateSize(int size) {
-        if (size <= 0 || size > 100) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "[상품 목록 조회 실패]: size는 1 이상 100 이하여야 합니다."
-            );
-        }
     }
 
     private ProductSummaryResponse toResponse(ProductSummaryNativeProjection row) {

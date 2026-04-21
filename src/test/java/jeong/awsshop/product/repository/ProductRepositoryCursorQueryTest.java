@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import jeong.awsshop.product.service.dataimport.BulkInsertService;
-import jeong.awsshop.product.service.productread.dto.ProductSummaryNativeProjection;
+import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
