@@ -23,6 +23,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'    // 데이터베이스 연동 및 ORM(JPA/Hibernate) 관리
     implementation 'org.springframework.boot:spring-boot-starter-web'        // 웹 애플리케이션 개발 (REST API, MVC)
     implementation 'com.fasterxml.jackson.core:jackson-databind'              // JSON 파싱을 위한 ObjectMapper
+    implementation 'org.springframework.boot:spring-boot-starter-validation' // 입력 데이터 검증 (Bean Validation API)
 
     // --- Database (런타임 환경) ---
     runtimeOnly 'com.mysql:mysql-connector-j'                               // MySQL 드라이버
