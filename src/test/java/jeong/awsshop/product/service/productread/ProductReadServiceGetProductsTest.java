@@ -10,9 +10,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
+import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
-import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.dto.ProductSummaryResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ProductReadServiceTest {
+class ProductReadServiceGetProductsTest {
 
     @Mock
     private ProductRepository productRepository;

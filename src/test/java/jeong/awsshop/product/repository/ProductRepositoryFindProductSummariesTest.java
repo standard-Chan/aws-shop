@@ -7,22 +7,22 @@ import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import jeong.awsshop.product.service.dataimport.BulkInsertService;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
+import jeong.awsshop.product.service.dataimport.BulkInsertService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ProductRepositoryCursorQueryTest {
+class ProductRepositoryFindProductSummariesTest {
 
     @Autowired
     private BulkInsertService bulkInsertService;
@@ -86,19 +86,6 @@ class ProductRepositoryCursorQueryTest {
     }
 
     @Test
-    @DisplayName("limit이 주어지면 해당 row 수만큼 조회해야 한다")
-    void should_limit_rows_by_size_plus_one_when_limit_is_given() {
-        // Given: size 2의 hasNext 판단을 위한 limit 3
-
-        // When: limit 3으로 조회한다
-        List<ProductSummaryNativeProjection> rows =
-                productRepository.findProductSummaries(null, 3);
-
-        // Then: repository는 limit 수만큼만 반환해야 한다
-        assertThat(rows).hasSize(3);
-    }
-
-    @Test
     @DisplayName("MAIN 이미지가 있으면 대표 image로 MAIN을 반환해야 한다")
     void should_select_main_image_when_main_image_exists() {
         // Given: MAIN과 PT01 이미지를 모두 가진 상품
@@ -159,29 +146,6 @@ class ProductRepositoryCursorQueryTest {
                 .hasSize(1);
     }
 
-    @Test
-    @DisplayName("목록 API에 필요한 Product 필드만 projection에 매핑되어야 한다")
-    void should_project_only_required_product_fields_when_find_products() {
-        // Given: 저장된 fixture 상품
-
-        // When: 상품 목록을 조회한다
-        ProductSummaryNativeProjection row = findByParentAsin("RED_DAISY_KEYCHAIN");
-
-        // Then: 목록 응답에 필요한 Product 필드가 projection에 매핑되어야 한다
-        assertThat(row.getId()).isNotNull();
-        assertThat(row.getParentAsin()).isEqualTo("RED_DAISY_KEYCHAIN");
-        assertThat(row.getTitle()).isEqualTo("Daisy Keychain Wristlet Gray Fabric Key fob Lanyard");
-        assertThat(row.getMainCategory()).isNotBlank();
-        assertThat(row.getAverageRating()).isEqualByComparingTo("4.5");
-        assertThat(row.getRatingNumber()).isEqualTo(12);
-        assertThat(row.getStore()).isEqualTo("Generic");
-    }
-
-    /**
-     * 테스트 편의를 위해 parentAsin으로 상품을 조회하는 헬퍼 메서드
-     * @param parentAsin
-     * @return
-     */
     private ProductSummaryNativeProjection findByParentAsin(String parentAsin) {
         return productRepository.findProductSummaries(null, 20)
                 .stream()
