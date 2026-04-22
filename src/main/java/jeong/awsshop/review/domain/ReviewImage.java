@@ -32,6 +32,9 @@ public class ReviewImage {
     @Column(name = "large_image_url")
     private String largeImageUrl;
 
+    @Column(name = "attachment_type")
+    private String attachmentType;
+
     @Builder
     public ReviewImage(Review review, String smallImageUrl,
         String mediumImageUrl, String largeImageUrl) {
