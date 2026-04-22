@@ -30,10 +30,13 @@ public record ProductCategoryCursorResponse(
         return new ProductCategoryCursorResponse(products, nextCursor, hasNext);
     }
 
+    /**
+     * 정렬 기준에 맞는 cursor 응답을 선택한다.
+     */
     private static CategoryCursor cursorFrom(ProductSummaryResponse product, boolean averageRatingSort) {
         if (averageRatingSort) {
-            return new CategoryCursor(product.id(), product.averageRating(), null);
+            return CategoryCursor.averageRatingCursor(product);
         }
-        return new CategoryCursor(product.id(), null, product.ratingNumber());
+        return CategoryCursor.ratingNumberCursor(product);
     }
 }
