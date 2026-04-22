@@ -15,13 +15,14 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Product {
+public class Product implements Persistable<Long> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // snowflake ID
     private Long id;
 
     // 제품의 고유 식별자 역할을 하는 ASIN 필드
@@ -83,6 +84,17 @@ public class Product {
         this.price = price;
         this.store = store;
         this.details = details;
+    }
+
+    @Override
+    public Long getId() {
+        return id;
+    }
+
+    /* GeneratedValue 대신 Snowflake ID를 사용하므로, INSERT 가 가능하도록 true 반환 */
+    @Override
+    public boolean isNew() {
+        return true;
     }
 
     public void addFeature(ProductFeature feature) {
