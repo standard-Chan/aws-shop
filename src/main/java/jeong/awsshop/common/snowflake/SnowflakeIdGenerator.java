@@ -1,5 +1,7 @@
 package jeong.awsshop.common.snowflake;
 
+import org.springframework.stereotype.Component;
+
 /**
  * Twitter Snowflake 알고리즘 기반 분산 고유 ID 생성기
  *
@@ -10,6 +12,7 @@ package jeong.awsshop.common.snowflake;
  * | 0 (1bit)  | timestamp (41bit)| node(10) | seq (12)  |
  * +-----------+------------------+----------+-----------+
  */
+@Component
 public class SnowflakeIdGenerator {
 
     // ---- 비트 할당 ----

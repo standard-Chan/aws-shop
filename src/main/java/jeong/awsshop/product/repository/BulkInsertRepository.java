@@ -14,7 +14,6 @@ import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.service.dataimport.dto.ProductDto;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -24,7 +23,7 @@ public class BulkInsertRepository {
 
     private final DataSource dataSource;
     private final ObjectMapper objectMapper;
-    private final SnowflakeIdGenerator idGenerator = new SnowflakeIdGenerator();
+    private final SnowflakeIdGenerator idGenerator;
 
     public List<ProductDto> bulkInsert(List<ProductDto> dtos) {
 
