@@ -2,8 +2,6 @@ package jeong.awsshop.product.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -30,7 +28,6 @@ import lombok.NoArgsConstructor;
 public class ProductImage {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -51,7 +48,8 @@ public class ProductImage {
     private String hiRes;
 
     @Builder
-    public ProductImage(Product product, String variant, String thumb, String large, String hiRes) {
+    public ProductImage(Long id, Product product, String variant, String thumb, String large, String hiRes) {
+        this.id = id;
         this.product = product;
         this.variant = variant;
         this.thumb = thumb;
@@ -62,8 +60,9 @@ public class ProductImage {
     /**
      * 적재 흐름에서 사용할 child 생성 팩토리다.
      */
-    public static ProductImage of(Product product, String variant, String thumb, String large, String hiRes) {
+    public static ProductImage of(Long id, Product product, String variant, String thumb, String large, String hiRes) {
         return ProductImage.builder()
+                .id(id)
                 .product(product)
                 .variant(variant)
                 .thumb(thumb)

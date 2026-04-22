@@ -7,6 +7,7 @@ import static jeong.awsshop.common.json.JsonNodeValues.integer;
 import static jeong.awsshop.common.json.JsonNodeValues.isBlank;
 import static jeong.awsshop.common.json.JsonNodeValues.longValue;
 import static jeong.awsshop.common.json.JsonNodeValues.text;
+import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.domain.Product;
 import jeong.awsshop.product.domain.ProductBoughtTogether;
@@ -24,6 +25,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class DataImportProductAssembler {
 
+    private final SnowflakeIdGenerator idGenerator;
+
+    public DataImportProductAssembler(SnowflakeIdGenerator idGenerator) {
+        this.idGenerator = idGenerator;
+    }
+
     /**
      * 루트 노드를 Product와 child entity로 변환한다.
      * 필수값이 없으면 null을 반환한다.
@@ -36,6 +43,7 @@ public class DataImportProductAssembler {
         }
 
         Product product = Product.builder()
+                .id(idGenerator.nextId())
                 .parentAsin(parentAsin)
                 .title(title)
                 .mainCategory(mapMainCategory(fieldText(rootNode, DataImportJsonKey.MAIN_CATEGORY)))
@@ -67,7 +75,7 @@ public class DataImportProductAssembler {
                 index++;
                 continue;
             }
-            product.addFeature(ProductFeature.of(product, feature, index));
+            product.addFeature(ProductFeature.of(idGenerator.nextId(), product, feature, index));
             index++;
         }
     }
@@ -83,7 +91,7 @@ public class DataImportProductAssembler {
                 index++;
                 continue;
             }
-            product.addDescription(ProductDescription.of(product, description, index));
+            product.addDescription(ProductDescription.of(idGenerator.nextId(), product, description, index));
             index++;
         }
     }
@@ -97,7 +105,7 @@ public class DataImportProductAssembler {
             if (isBlank(category)) {
                 continue;
             }
-            product.addCategory(ProductCategory.of(product, category));
+            product.addCategory(ProductCategory.of(idGenerator.nextId(), product, category));
         }
     }
 
@@ -110,6 +118,7 @@ public class DataImportProductAssembler {
                 continue;
             }
             product.addImage(ProductImage.of(
+                    idGenerator.nextId(),
                     product,
                     text(item.get("variant")),
                     text(item.get("thumb")),
@@ -127,6 +136,7 @@ public class DataImportProductAssembler {
                 continue;
             }
             product.addVideo(ProductVideo.of(
+                    idGenerator.nextId(),
                     product,
                     text(item.get("title")),
                     text(item.get("url")),
@@ -147,6 +157,7 @@ public class DataImportProductAssembler {
             return;
         }
         product.addBoughtTogether(ProductBoughtTogether.of(
+                idGenerator.nextId(),
                 product,
                 relatedProductId,
                 text(node.get(DataImportJsonKey.RELATED_PRODUCT_TITLE.value())),

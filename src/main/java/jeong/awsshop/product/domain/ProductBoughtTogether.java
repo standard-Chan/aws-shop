@@ -2,8 +2,6 @@ package jeong.awsshop.product.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -21,7 +19,6 @@ import lombok.NoArgsConstructor;
 public class ProductBoughtTogether {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -38,7 +35,9 @@ public class ProductBoughtTogether {
     private String relatedProductImageUrl;
 
     @Builder
-    public ProductBoughtTogether(Product product, Long relatedProductId, String relatedProductTitle, String relatedProductImageUrl) {
+    public ProductBoughtTogether(Long id, Product product, Long relatedProductId, String relatedProductTitle,
+                                 String relatedProductImageUrl) {
+        this.id = id;
         this.product = product;
         this.relatedProductId = relatedProductId;
         this.relatedProductTitle = relatedProductTitle;
@@ -48,9 +47,10 @@ public class ProductBoughtTogether {
     /**
      * 적재 흐름에서 사용할 child 생성 팩토리다.
      */
-    public static ProductBoughtTogether of(Product product, Long relatedProductId, String relatedProductTitle,
+    public static ProductBoughtTogether of(Long id, Product product, Long relatedProductId, String relatedProductTitle,
                                            String relatedProductImageUrl) {
         return ProductBoughtTogether.builder()
+                .id(id)
                 .product(product)
                 .relatedProductId(relatedProductId)
                 .relatedProductTitle(relatedProductTitle)

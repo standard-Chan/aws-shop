@@ -2,8 +2,6 @@ package jeong.awsshop.product.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -37,7 +35,6 @@ import lombok.NoArgsConstructor;
 public class ProductFeature {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -51,7 +48,8 @@ public class ProductFeature {
     private Integer featureIndex;
 
     @Builder
-    public ProductFeature(Product product, String feature, Integer featureIndex) {
+    public ProductFeature(Long id, Product product, String feature, Integer featureIndex) {
+        this.id = id;
         this.product = product;
         this.feature = feature;
         this.featureIndex = featureIndex;
@@ -60,8 +58,9 @@ public class ProductFeature {
     /**
      * 적재 흐름에서 사용할 child 생성 팩토리다.
      */
-    public static ProductFeature of(Product product, String feature, Integer featureIndex) {
+    public static ProductFeature of(Long id, Product product, String feature, Integer featureIndex) {
         return ProductFeature.builder()
+                .id(id)
                 .product(product)
                 .feature(feature)
                 .featureIndex(featureIndex)

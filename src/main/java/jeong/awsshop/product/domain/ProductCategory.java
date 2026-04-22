@@ -1,8 +1,6 @@
 package jeong.awsshop.product.domain;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -32,7 +30,6 @@ import lombok.NoArgsConstructor;
 public class ProductCategory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -42,7 +39,8 @@ public class ProductCategory {
     private String category;
 
     @Builder
-    public ProductCategory(Product product, String category) {
+    public ProductCategory(Long id, Product product, String category) {
+        this.id = id;
         this.product = product;
         this.category = category;
     }
@@ -50,8 +48,9 @@ public class ProductCategory {
     /**
      * 적재 흐름에서 사용할 child 생성 팩토리다.
      */
-    public static ProductCategory of(Product product, String category) {
+    public static ProductCategory of(Long id, Product product, String category) {
         return ProductCategory.builder()
+                .id(id)
                 .product(product)
                 .category(category)
                 .build();

@@ -2,8 +2,6 @@ package jeong.awsshop.product.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -28,7 +26,6 @@ import lombok.NoArgsConstructor;
 public class ProductVideo {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -44,7 +41,8 @@ public class ProductVideo {
     private String userId;
 
     @Builder
-    public ProductVideo(Product product, String url, String title, String userId) {
+    public ProductVideo(Long id, Product product, String url, String title, String userId) {
+        this.id = id;
         this.product = product;
         this.url = url;
         this.title = title;
@@ -54,8 +52,9 @@ public class ProductVideo {
     /**
      * 적재 흐름에서 사용할 child 생성 팩토리다.
      */
-    public static ProductVideo of(Product product, String title, String url, String userId) {
+    public static ProductVideo of(Long id, Product product, String title, String url, String userId) {
         return ProductVideo.builder()
+                .id(id)
                 .product(product)
                 .title(title)
                 .url(url)
