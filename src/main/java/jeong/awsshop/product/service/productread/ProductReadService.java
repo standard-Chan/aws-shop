@@ -1,10 +1,7 @@
 package jeong.awsshop.product.service.productread;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.exception.productread.MissingCategoryCursorIdException;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
@@ -21,15 +18,9 @@ import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.ProductVideoRepository;
 import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
-import jeong.awsshop.product.service.productread.dto.ProductBoughtTogetherResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCategoryCursorResponse;
-import jeong.awsshop.product.service.productread.dto.ProductCategoryResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
-import jeong.awsshop.product.service.productread.dto.ProductDescriptionResponse;
 import jeong.awsshop.product.service.productread.dto.ProductDetailResponse;
-import jeong.awsshop.product.service.productread.dto.ProductFeatureResponse;
-import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
-import jeong.awsshop.product.service.productread.dto.ProductVideoResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,15 +36,14 @@ public class ProductReadService {
     private final ProductBoughtTogetherRepository productBoughtTogetherRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductVideoRepository productVideoRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * cursor 목록 조회 결과를 응답 DTO로 반환한다.
+     * id 조회 cursor 목록 조회 결과를 응답 DTO로 반환한다.
      */
     @Transactional(readOnly = true)
-    public ProductCursorResponse getProducts(int size, Long cursor) {
+    public ProductCursorResponse getProducts(int size, Long cursorId) {
         List<ProductSummaryNativeProjection> rows =
-                productRepository.findProductSummaries(cursor, queryLimitForHasNext(size));
+                productRepository.findProductSummaries(cursorId, queryLimitForHasNext(size));
         return ProductCursorResponse.from(rows, size);
     }
 
@@ -71,20 +61,20 @@ public class ProductReadService {
             boolean ratingNumber
     ) {
         MainCategory category = parseCategory(mainCategory);
-        // averageRating 정렬인지, ratingNumber 정렬인지에 따라 정렬 기준을 선택한다. (averageRating 우선)
-        boolean averageRatingSort = shouldSortByAverageRating(averageRating, ratingNumber);
-        validateCursor(category, cursorId, cursorAverageRating, cursorRatingNumber, averageRatingSort);
+
+        boolean sortByAverageRating = shouldSortByAverageRating(averageRating, ratingNumber);
+        validateCursor(category, cursorId, cursorAverageRating, cursorRatingNumber, sortByAverageRating);
 
         List<ProductSummaryNativeProjection> rows = findCategoryProductSummaries(
                 category,
                 cursorId,
                 cursorAverageRating,
                 cursorRatingNumber,
-                averageRatingSort,
+                sortByAverageRating,
                 queryLimitForHasNext(size)
         );
 
-        return ProductCategoryCursorResponse.from(rows, size, averageRatingSort);
+        return ProductCategoryCursorResponse.from(rows, size, sortByAverageRating);
     }
 
     /**
@@ -93,59 +83,18 @@ public class ProductReadService {
     @Transactional(readOnly = true)
     public ProductDetailResponse getProductDetail(Long id) {
         ProductDetailProjection product = productRepository.findDetailById(id)
-                .orElseThrow(ProductNotFoundException::new);
+                .orElseThrow(() -> new ProductNotFoundException(id));
 
-        // 조회 성능을 위해서, 개별 repository에서 필요한 연관 정보들을 각각 조회한다.
-        return new ProductDetailResponse(
-                product.getId(),
-                product.getParentAsin(),
-                product.getTitle(),
-                MainCategory.valueOf(product.getMainCategory()),
-                product.getAverageRating(),
-                product.getRatingNumber(),
-                product.getPrice(),
-                product.getStore(),
-                parseDetails(product.getDetails()),
-                productFeatureRepository.findFeatureDetailsByProductId(id)
-                        .stream()
-                        .map(ProductFeatureResponse::from)
-                        .toList(),
-                productDescriptionRepository.findDescriptionDetailsByProductId(id)
-                        .stream()
-                        .map(ProductDescriptionResponse::from)
-                        .toList(),
-                productCategoryRepository.findCategoryDetailsByProductId(id)
-                        .stream()
-                        .map(ProductCategoryResponse::from)
-                        .toList(),
-                productBoughtTogetherRepository.findBoughtTogetherDetailsByProductId(id)
-                        .stream()
-                        .map(ProductBoughtTogetherResponse::from)
-                        .toList(),
-                productImageRepository.findImageDetailsByProductId(id)
-                        .stream()
-                        .map(ProductImageResponse::from)
-                        .toList(),
+        // 단일 쿼리가 아닌, 개별 쿼리로 연관 정보들을 각각 조회한다. (단일 JOIN 시, 지나치게 많은 rows 조회 문제)
+        return ProductDetailResponse.from(
+                product,
+                productFeatureRepository.findFeatureDetailsByProductId(id),
+                productDescriptionRepository.findDescriptionDetailsByProductId(id),
+                productCategoryRepository.findCategoryDetailsByProductId(id),
+                productBoughtTogetherRepository.findBoughtTogetherDetailsByProductId(id),
+                productImageRepository.findImageDetailsByProductId(id),
                 productVideoRepository.findVideoDetailsByProductId(id)
-                        .stream()
-                        .map(ProductVideoResponse::from)
-                        .toList()
         );
-    }
-
-    /**
-     * details JSON 문자열을 응답용 map으로 변환한다.
-     */
-    private Map<String, Object> parseDetails(String details) {
-        if (details == null || details.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(details, new TypeReference<>() {
-            });
-        } catch (Exception e) {
-            throw new IllegalStateException("[Product 상세 조회 실패]: details JSON 파싱에 실패했습니다.", e);
-        }
     }
 
     /**
@@ -163,10 +112,10 @@ public class ProductReadService {
             Long cursorId,
             BigDecimal cursorAverageRating,
             Integer cursorRatingNumber,
-            boolean averageRatingSort,
+            boolean sortByAverageRating,
             int limit
     ) {
-        if (averageRatingSort) {
+        if (sortByAverageRating) {
             return productRepository.findCategoryProductSummariesOrderByAverageRating(
                     category,
                     cursorId,
@@ -208,12 +157,12 @@ public class ProductReadService {
             Long cursorId,
             BigDecimal cursorAverageRating,
             Integer cursorRatingNumber,
-            boolean averageRatingSort
+            boolean sortByAverageRating
     ) {
         boolean sortCursorValueExists = hasSortCursorValue(
                 cursorAverageRating,
                 cursorRatingNumber,
-                averageRatingSort
+                sortByAverageRating
         );
         validateCursorPair(cursorId, sortCursorValueExists);
         if (cursorId == null) {
@@ -228,9 +177,9 @@ public class ProductReadService {
     private boolean hasSortCursorValue(
             BigDecimal cursorAverageRating,
             Integer cursorRatingNumber,
-            boolean averageRatingSort
+            boolean sortByAverageRating
     ) {
-        return averageRatingSort
+        return sortByAverageRating
                 ? cursorAverageRating != null
                 : cursorRatingNumber != null;
     }

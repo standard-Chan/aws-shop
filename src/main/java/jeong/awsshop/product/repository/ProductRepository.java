@@ -89,7 +89,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             ORDER BY p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findProductSummaries(
-            @Param("cursor") Long cursor,
+            @Param("cursor") Long cursorId,
             @Param("limit") int limit
     );
 
