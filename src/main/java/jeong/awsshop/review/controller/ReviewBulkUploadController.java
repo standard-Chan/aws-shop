@@ -21,7 +21,7 @@ public class ReviewBulkUploadController {
 
     private final ReviewBulkUploadService reviewBulkUploadService;
 
-    @PostMapping("/api/reviews/bulk-upload/jsonl")
+    @PostMapping("/api/reviews/bulk-upload")
     public ResponseEntity<ReviewBulkUploadResponse> upload(
             HttpServletRequest request,
             @RequestParam(name = "batch-size", required = false, defaultValue = "100")

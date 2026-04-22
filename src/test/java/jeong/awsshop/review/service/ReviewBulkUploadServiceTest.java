@@ -97,7 +97,7 @@ class ReviewBulkUploadServiceTest {
     }
 
     @Test
-    @DisplayName("blank line이 있어도 Jackson parser가 whitespace로 처리하고 정상 record를 저장해야 한다")
+    @DisplayName("blank line이 있어도 정상 record를 저장해야 한다")
     void should_ignore_blank_lines_as_json_whitespace_when_stream_contains_blank_lines() {
         // Given: blank line과 정상 line이 섞인 stream
         List<List<ReviewDto>> capturedBatches = captureSuccessfulBatches();
@@ -110,6 +110,75 @@ class ReviewBulkUploadServiceTest {
         // Then: 정상 record만 repository에 전달되어야 한다
         verify(reviewBulkInsertRepository).bulkInsert(anyList());
         assertThat(capturedBatches.get(0)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("JSONL 파싱 에러가 발생하면 실패 line을 저장하고 다음 line을 계속 처리해야 한다")
+    void should_write_failed_line_and_continue_when_jsonl_parse_error_occurs() throws Exception {
+        // Given: 깨진 JSON line 사이에 정상 line이 있는 stream
+        List<List<ReviewDto>> capturedBatches = captureSuccessfulBatches();
+        String invalidLine = "{\"rating\":1.0,\"title\":\"broken\"";
+        String jsonl = VALID_REVIEW_JSONL + invalidLine + "\n" + REVIEW_WITH_IMAGE_JSONL;
+        InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
+
+        // When: 파싱 실패 line이 포함된 JSONL stream을 업로드한다
+        reviewBulkUploadService.upload(inputStream, 100, "failed-reviews");
+
+        // Then: 실패 line은 failed JSONL에 저장되고 정상 line 처리는 계속되어야 한다
+        verify(reviewBulkInsertRepository).bulkInsert(anyList());
+        assertThat(capturedBatches.get(0)).hasSize(2);
+        assertThat(capturedBatches.get(0)).extracting(ReviewDto::asin)
+                .containsExactly("B07G584SHG", "B07R7WVRGL");
+
+        String failedJsonl = Files.readString(Paths.get(FAILED_JSONL_FILE_PATH));
+        assertThat(failedJsonl).contains(invalidLine);
+    }
+
+    @Test
+    @DisplayName("잘못된 형식의 JSON 객체가 들어오면 실패 line을 저장하고 다음 line을 계속 처리해야 한다")
+    void should_write_failed_line_and_continue_when_json_mapping_error_occurs() throws Exception {
+        // Given: images field 형식이 배열이 아닌 실패 line이 있다
+        List<List<ReviewDto>> capturedBatches = captureSuccessfulBatches();
+        String invalidLine = """
+            {"rating":1.0,"title":"Invalid images","text":"broken","images":{"small_image_url":"small"},"asin":"B000BROKEN","parent_asin":"PARENT","user_id":"USER","timestamp":1602133857705,"helpful_vote":0,"verified_purchase":true}
+            """.strip();
+        String jsonl = invalidLine + "\n" + VALID_REVIEW_JSONL;
+        InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
+
+        // When: mapping 실패 line이 포함된 JSONL stream을 업로드한다
+        reviewBulkUploadService.upload(inputStream, 100, "failed-reviews");
+
+        // Then: 실패 line은 failed JSONL에 저장되고 정상 line은 repository로 전달되어야 한다
+        verify(reviewBulkInsertRepository).bulkInsert(anyList());
+        assertThat(capturedBatches.get(0)).hasSize(1);
+        assertThat(capturedBatches.get(0).get(0).asin()).isEqualTo("B07G584SHG");
+
+        String failedJsonl = Files.readString(Paths.get(FAILED_JSONL_FILE_PATH));
+        assertThat(failedJsonl).contains(invalidLine);
+    }
+
+    @Test
+    @DisplayName("DTO 변환 에러가 발생하면 실패 line을 저장하고 다음 line을 계속 처리해야 한다")
+    void should_write_failed_line_and_continue_when_dto_conversion_error_occurs() throws Exception {
+        // Given: JSON 파싱은 가능하지만 ReviewDto 타입으로 변환할 수 없는 line이 있다
+        List<List<ReviewDto>> capturedBatches = captureSuccessfulBatches();
+        String invalidLine = """
+            {"rating":{"value":1.0},"title":"Invalid rating","text":"broken","images":[],"asin":"B000BROKEN","parent_asin":"PARENT","user_id":"USER","timestamp":1602133857705,"helpful_vote":0,"verified_purchase":true}
+            """.strip();
+        String jsonl = VALID_REVIEW_JSONL + invalidLine + "\n" + REVIEW_WITH_IMAGE_JSONL;
+        InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
+
+        // When: DTO 변환 실패 line이 포함된 JSONL stream을 업로드한다
+        reviewBulkUploadService.upload(inputStream, 100, "failed-reviews");
+
+        // Then: 실패 line은 failed JSONL에 저장되고 다음 정상 line은 계속 처리되어야 한다
+        verify(reviewBulkInsertRepository).bulkInsert(anyList());
+        assertThat(capturedBatches.get(0)).hasSize(2);
+        assertThat(capturedBatches.get(0)).extracting(ReviewDto::asin)
+                .containsExactly("B07G584SHG", "B07R7WVRGL");
+
+        String failedJsonl = Files.readString(Paths.get(FAILED_JSONL_FILE_PATH));
+        assertThat(failedJsonl).contains(invalidLine);
     }
 
     @Test

@@ -1,10 +1,13 @@
 package jeong.awsshop.review.service;
 
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,11 +40,22 @@ public class ReviewBulkUploadService {
                     failedRowsPath,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND
-            )) {
-                JsonParser parser = objectMapper.getFactory().createParser(inputStream);
+            );
+                 BufferedReader reader = new BufferedReader(
+                         new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+                 )
+            ) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) {
+                        continue;
+                    }
 
-                while (parser.nextToken() != null) {
-                    ReviewDto reviewDto = objectMapper.readValue(parser, ReviewDto.class);
+                    ReviewDto reviewDto = parseLine(writer, line);
+                    if (reviewDto == null) {
+                        continue;
+                    }
+
                     buffer.add(reviewDto);
 
                     if (buffer.size() >= batchSize) {
@@ -62,6 +76,31 @@ public class ReviewBulkUploadService {
         }
 
         return new ReviewBulkUploadResponse(failedRowsPath.getFileName().toString());
+    }
+
+    private ReviewDto parseLine(BufferedWriter writer, String line) throws IOException {
+        JsonNode jsonNode;
+
+        try {
+            jsonNode = objectMapper.readTree(line);
+        } catch (Exception e) {
+            log.error("[Review JSONL 파싱 실패]: 실패한 line을 실패 JSONL에 저장하고 다음 line을 처리합니다. line: {}", line, e);
+            writeFailedRow(writer, line);
+            return null;
+        }
+
+        try {
+            return objectMapper.treeToValue(jsonNode, ReviewDto.class);
+        } catch (Exception e) {
+            log.error("[Review DTO 변환 실패]: 실패한 line을 실패 JSONL에 저장하고 다음 line을 처리합니다. line: {}", line, e);
+            writeFailedRow(writer, line);
+            return null;
+        }
+    }
+
+    private void writeFailedRow(BufferedWriter writer, String line) throws IOException {
+        writer.write(line);
+        writer.newLine();
     }
 
     private void writeFailedRows(BufferedWriter writer, List<ReviewDto> failedRows) throws IOException {

@@ -1,10 +1,13 @@
 package jeong.awsshop.product.service.dataimport;
 
-import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -29,16 +32,33 @@ public class BulkInsertService {
 
         String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed_rows.jsonl";
 
+        try {
+            Files.createDirectories(Paths.get(FAILED_ROWS_FILE_PATH).getParent());
+        } catch (IOException e) {
+            log.error("[Bulk Insert] Failed to create failed rows directory", e);
+            return;
+        }
+
         try (BufferedWriter writer = Files.newBufferedWriter(
             Paths.get(FAILED_ROWS_FILE_PATH),
             StandardOpenOption.CREATE,
             StandardOpenOption.APPEND
-        )) {
+        );
+             BufferedReader reader = new BufferedReader(
+                 new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+             )
+        ) {
 
-            JsonParser parser = objectMapper.getFactory().createParser(inputStream);
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank()) {
+                    continue;
+                }
 
-            while (parser.nextToken() != null) {
-                ProductDto productDto = objectMapper.readValue(parser, ProductDto.class);
+                ProductDto productDto = parseLine(writer, line);
+                if (productDto == null) {
+                    continue;
+                }
                 buffer.add(productDto);
 
                 if (buffer.size() >= 100) {
@@ -64,11 +84,38 @@ public class BulkInsertService {
         }
     }
 
+    private ProductDto parseLine(BufferedWriter writer, String line) throws IOException {
+        JsonNode jsonNode;
+
+        try {
+            jsonNode = objectMapper.readTree(line);
+        } catch (Exception e) {
+            log.error("[Product JSONL 파싱 실패]: 실패한 line을 실패 JSONL에 저장하고 다음 line을 처리합니다. json: {}", line, e);
+            writeFailedRow(writer, line);
+            return null;
+        }
+
+        try {
+            return objectMapper.treeToValue(jsonNode, ProductDto.class);
+        } catch (Exception e) {
+            log.error("[Product DTO 변환 실패]: 실패한 line을 실패 JSONL에 저장하고 다음 line을 처리합니다. json: {}", line, e);
+            writeFailedRow(writer, line);
+            return null;
+        }
+    }
+
+    private void writeFailedRow(BufferedWriter writer, String line) throws IOException {
+        writer.write(line);
+        writer.newLine();
+    }
+
     /**
      * 실패한 행들을 JSONL 파일로 저장하는 메서드
      */
     private void writeFailedRows(BufferedWriter writer, List<ProductDto> failedRows) throws IOException {
-        if (failedRows == null || failedRows.isEmpty()) return;
+        if (failedRows == null || failedRows.isEmpty()) {
+            return;
+        }
 
         for (ProductDto dto : failedRows) {
             writer.write(objectMapper.writeValueAsString(dto));

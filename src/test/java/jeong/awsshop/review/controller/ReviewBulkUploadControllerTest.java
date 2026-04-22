@@ -42,7 +42,7 @@ class ReviewBulkUploadControllerTest {
                 .thenReturn(response);
 
         // When: JSONL body stream으로 bulk upload API를 호출한다
-        mockMvc.perform(post("/api/reviews/bulk-upload/jsonl")
+        mockMvc.perform(post("/api/reviews/bulk-upload")
                         .param("batch-size", "100")
                         .param("filename", "failed-reviews")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -60,7 +60,7 @@ class ReviewBulkUploadControllerTest {
         // Given: 허용 범위를 벗어난 batch-size
 
         // When & Then: batch-size가 0이면 요청을 거절해야 한다
-        mockMvc.perform(post("/api/reviews/bulk-upload/jsonl")
+        mockMvc.perform(post("/api/reviews/bulk-upload")
                         .param("batch-size", "0")
                         .param("filename", "failed-reviews")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -68,7 +68,7 @@ class ReviewBulkUploadControllerTest {
                 .andExpect(status().isBadRequest());
 
         // When & Then: batch-size가 1000을 초과하면 요청을 거절해야 한다
-        mockMvc.perform(post("/api/reviews/bulk-upload/jsonl")
+        mockMvc.perform(post("/api/reviews/bulk-upload")
                         .param("batch-size", "1001")
                         .param("filename", "failed-reviews")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -86,7 +86,7 @@ class ReviewBulkUploadControllerTest {
         // Given: 실패 JSONL 파일명으로 사용할 수 없는 blank filename
 
         // When & Then: filename이 blank이면 요청을 거절해야 한다
-        mockMvc.perform(post("/api/reviews/bulk-upload/jsonl")
+        mockMvc.perform(post("/api/reviews/bulk-upload")
                         .param("batch-size", "100")
                         .param("filename", " ")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
