@@ -36,16 +36,8 @@ class ReviewBulkUploadControllerTest {
     @Test
     @DisplayName("유효한 요청이면 request body stream과 파라미터를 service로 전달해야 한다")
     void should_call_service_with_request_body_stream_when_valid_request_is_given() throws Exception {
-        // Given: service가 성공 summary를 반환하도록 준비한다
-        ReviewBulkUploadResponse response = new ReviewBulkUploadResponse(
-                1L,
-                1L,
-                1,
-                1L,
-                0L,
-                0L,
-                "failedJsonl/failed-reviews.jsonl"
-        );
+        // Given: service가 실패 JSONL 파일 위치를 반환하도록 준비한다
+        ReviewBulkUploadResponse response = new ReviewBulkUploadResponse("failed-reviews.jsonl");
         when(reviewBulkUploadService.upload(any(InputStream.class), eq(100), eq("failed-reviews")))
                 .thenReturn(response);
 
