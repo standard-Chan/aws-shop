@@ -2,6 +2,7 @@ package jeong.awsshop.review.repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
@@ -17,52 +18,36 @@ import org.springframework.stereotype.Repository;
 @Slf4j
 public class ReviewBulkInsertRepository {
 
+    private static final String REVIEW_INSERT_SQL = """
+        INSERT INTO review (
+            id, user_id, product_id, asin, rating, title, text, timestamp, verified_purchase, helpful_vote
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """;
+
+    private static final String REVIEW_IMAGE_INSERT_SQL = """
+        INSERT INTO review_image (
+            id, review_id, small_image_url, medium_image_url, large_image_url, attachment_type
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """;
+
     private final DataSource dataSource;
     private final SnowflakeIdGenerator idGenerator;
 
     public List<ReviewDto> bulkInsert(List<ReviewDto> reviews) {
-        String reviewSql = """
-            INSERT INTO review (
-                id, user_id, product_id, asin, rating, title, text, timestamp, verified_purchase, helpful_vote
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """;
-
-        String imageSql = """
-            INSERT INTO review_image (
-                id, review_id, small_image_url, medium_image_url, large_image_url, attachment_type
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        """;
-
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
 
             try (
-                    PreparedStatement reviewPs = connection.prepareStatement(reviewSql);
-                    PreparedStatement imagePs = connection.prepareStatement(imageSql)
+                    PreparedStatement reviewPs = connection.prepareStatement(REVIEW_INSERT_SQL);
+                    PreparedStatement imagePs = connection.prepareStatement(REVIEW_IMAGE_INSERT_SQL)
             ) {
                 for (ReviewDto dto : reviews) {
                     long reviewId = idGenerator.nextId();
 
-                    reviewPs.setLong(1, reviewId);
-                    reviewPs.setString(2, dto.userId());
-                    reviewPs.setString(3, dto.parentAsin());
-                    reviewPs.setString(4, dto.asin());
-                    reviewPs.setFloat(5, dto.rating());
-                    reviewPs.setString(6, dto.title());
-                    reviewPs.setString(7, dto.text());
-                    reviewPs.setLong(8, dto.timestamp());
-                    reviewPs.setBoolean(9, dto.verifiedPurchase());
-                    reviewPs.setInt(10, dto.helpfulVote());
-                    reviewPs.addBatch();
+                    addReviewBatch(reviewPs, dto, reviewId);
 
                     for (ReviewImageDto image : dto.imagesOrEmpty()) {
-                        imagePs.setLong(1, idGenerator.nextId());
-                        imagePs.setLong(2, reviewId);
-                        imagePs.setString(3, image.smallImageUrl());
-                        imagePs.setString(4, image.mediumImageUrl());
-                        imagePs.setString(5, image.largeImageUrl());
-                        imagePs.setString(6, image.attachmentType());
-                        imagePs.addBatch();
+                        addReviewImageBatch(imagePs, image, reviewId);
                     }
                 }
 
@@ -78,5 +63,30 @@ public class ReviewBulkInsertRepository {
             log.error("[Review Bulk Insert 실패]: batch insert 중 오류가 발생했습니다.", e);
             return reviews;
         }
+    }
+
+    private void addReviewBatch(PreparedStatement reviewPs, ReviewDto dto, long reviewId) throws SQLException {
+        reviewPs.setLong(1, reviewId);
+        reviewPs.setString(2, dto.userId());
+        reviewPs.setString(3, dto.parentAsin());
+        reviewPs.setString(4, dto.asin());
+        reviewPs.setFloat(5, dto.rating());
+        reviewPs.setString(6, dto.title());
+        reviewPs.setString(7, dto.text());
+        reviewPs.setLong(8, dto.timestamp());
+        reviewPs.setBoolean(9, dto.verifiedPurchase());
+        reviewPs.setInt(10, dto.helpfulVote());
+        reviewPs.addBatch();
+    }
+
+    private void addReviewImageBatch(PreparedStatement imagePs, ReviewImageDto image, long reviewId)
+            throws SQLException {
+        imagePs.setLong(1, idGenerator.nextId());
+        imagePs.setLong(2, reviewId);
+        imagePs.setString(3, image.smallImageUrl());
+        imagePs.setString(4, image.mediumImageUrl());
+        imagePs.setString(5, image.largeImageUrl());
+        imagePs.setString(6, image.attachmentType());
+        imagePs.addBatch();
     }
 }

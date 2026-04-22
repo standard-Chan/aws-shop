@@ -6,6 +6,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -27,16 +28,13 @@ public class ReviewBulkUploadService {
 
     public ReviewBulkUploadResponse upload(InputStream inputStream, int batchSize, String filename) {
         List<ReviewDto> buffer = new ArrayList<>();
-
-        String failedRowsDirectory = "./aws-dataset/reviews";
-        String failedJsonlLocation = filename + ".jsonl";
-        String failedRowsFilePath = failedRowsDirectory + "/" + failedJsonlLocation;
+        Path failedRowsPath = Paths.get("./aws-dataset/reviews", filename + ".jsonl");
 
         try {
-            Files.createDirectories(Paths.get(failedRowsDirectory));
+            Files.createDirectories(failedRowsPath.getParent());
 
             try (BufferedWriter writer = Files.newBufferedWriter(
-                    Paths.get(failedRowsFilePath),
+                    failedRowsPath,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND
             )) {
@@ -63,11 +61,13 @@ public class ReviewBulkUploadService {
             log.error("[Review Bulk Upload 실패]: stream 또는 실패 JSONL 파일 처리 중 오류가 발생했습니다.", e);
         }
 
-        return new ReviewBulkUploadResponse(failedJsonlLocation);
+        return new ReviewBulkUploadResponse(failedRowsPath.getFileName().toString());
     }
 
     private void writeFailedRows(BufferedWriter writer, List<ReviewDto> failedRows) throws IOException {
-        if (failedRows == null || failedRows.isEmpty()) return;
+        if (failedRows == null || failedRows.isEmpty()) {
+            return;
+        }
 
         for (ReviewDto dto : failedRows) {
             writer.write(objectMapper.writeValueAsString(dto));
