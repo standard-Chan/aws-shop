@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -14,17 +15,25 @@ import lombok.NoArgsConstructor;
 
 
 @Entity
-@Table(name = "review")
+@Table(
+    name = "review",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_review_user_product_time",
+            columnNames = {"user_id", "product_id", "timestamp"}
+        )
+    }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review {
 
     @Id
     private Long id;
 
-    @Column(name = "user_id", nullable = true)
+    @Column(name = "user_id", nullable = false)
     private String user;
 
-    @Column(name = "product_id")
+    @Column(name = "product_id", nullable = false)
     private String parentAsin;
 
     @Column(name = "asin")

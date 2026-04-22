@@ -3,6 +3,7 @@ package jeong.awsshop.review.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
@@ -59,10 +60,18 @@ public class ReviewBulkInsertRepository {
                 connection.rollback();
                 throw e;
             }
+        } catch (SQLException e) {
+            // MySQL 유니크 키 등 제약조건 위반인 경우 (중복 데이터가 많아, 제외가 필요)
+            if (e instanceof SQLIntegrityConstraintViolationException
+                || e.getErrorCode() == 1062) {
+                log.info("[Bulk Insert] 유니크 키가 중복되어 insert 를 skip합니다.");
+                return new ArrayList<>();
+            }
         } catch (Exception e) {
             log.error("[Review Bulk Insert 실패]: batch insert 중 오류가 발생했습니다.", e);
             return reviews;
         }
+        return new ArrayList<>();
     }
 
     private void addReviewBatch(PreparedStatement reviewPs, ReviewDto dto, long reviewId) throws SQLException {
