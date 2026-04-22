@@ -2,13 +2,16 @@ package jeong.awsshop.product.controller;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductCategoryCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
+import jeong.awsshop.product.service.productread.dto.ProductDetailResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,5 +57,13 @@ public class ProductController {
                 averageRating,
                 ratingNumber
         );
+    }
+
+    /**
+     * Product id로 단일 상품 상세 정보를 조회한다.
+     */
+    @GetMapping("/{id}")
+    public ProductDetailResponse getProductDetail(@PathVariable @Positive Long id) {
+        return productReadService.getProductDetail(id);
     }
 }

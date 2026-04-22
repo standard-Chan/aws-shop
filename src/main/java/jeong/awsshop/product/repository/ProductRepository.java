@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.domain.Product;
+import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,22 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByParentAsin(String parentAsin);
 
     boolean existsByParentAsin(String parentAsin);
+
+    @Query(value = """
+            SELECT
+                p.id AS id,
+                p.parent_asin AS parentAsin,
+                p.title AS title,
+                p.main_category AS mainCategory,
+                p.average_rating AS averageRating,
+                p.rating_number AS ratingNumber,
+                p.price AS price,
+                p.store AS store,
+                p.details AS details
+            FROM product p
+            WHERE p.id = :id
+            """, nativeQuery = true)
+    Optional<ProductDetailProjection> findDetailById(@Param("id") Long id);
 
     @Query(value = """
             SELECT

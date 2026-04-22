@@ -1,17 +1,35 @@
 package jeong.awsshop.product.service.productread;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.exception.productread.MissingCategoryCursorIdException;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorNotFoundException;
+import jeong.awsshop.product.exception.productread.ProductNotFoundException;
 import jeong.awsshop.product.exception.productread.UnknownProductCategoryException;
+import jeong.awsshop.product.repository.ProductBoughtTogetherRepository;
+import jeong.awsshop.product.repository.ProductCategoryRepository;
+import jeong.awsshop.product.repository.ProductDescriptionRepository;
+import jeong.awsshop.product.repository.ProductFeatureRepository;
+import jeong.awsshop.product.repository.ProductImageRepository;
 import jeong.awsshop.product.repository.ProductRepository;
+import jeong.awsshop.product.repository.ProductVideoRepository;
+import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
+import jeong.awsshop.product.service.productread.dto.ProductBoughtTogetherResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCategoryCursorResponse;
+import jeong.awsshop.product.service.productread.dto.ProductCategoryResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
+import jeong.awsshop.product.service.productread.dto.ProductDescriptionResponse;
+import jeong.awsshop.product.service.productread.dto.ProductDetailResponse;
+import jeong.awsshop.product.service.productread.dto.ProductFeatureResponse;
+import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
+import jeong.awsshop.product.service.productread.dto.ProductVideoResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +39,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductReadService {
 
     private final ProductRepository productRepository;
+    private final ProductFeatureRepository productFeatureRepository;
+    private final ProductDescriptionRepository productDescriptionRepository;
+    private final ProductCategoryRepository productCategoryRepository;
+    private final ProductBoughtTogetherRepository productBoughtTogetherRepository;
+    private final ProductImageRepository productImageRepository;
+    private final ProductVideoRepository productVideoRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * cursor 목록 조회 결과를 응답 DTO로 반환한다.
@@ -60,6 +85,67 @@ public class ProductReadService {
         );
 
         return ProductCategoryCursorResponse.from(rows, size, averageRatingSort);
+    }
+
+    /**
+     * Product id로 상세 조회 결과를 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public ProductDetailResponse getProductDetail(Long id) {
+        ProductDetailProjection product = productRepository.findDetailById(id)
+                .orElseThrow(ProductNotFoundException::new);
+
+        // 조회 성능을 위해서, 개별 repository에서 필요한 연관 정보들을 각각 조회한다.
+        return new ProductDetailResponse(
+                product.getId(),
+                product.getParentAsin(),
+                product.getTitle(),
+                MainCategory.valueOf(product.getMainCategory()),
+                product.getAverageRating(),
+                product.getRatingNumber(),
+                product.getPrice(),
+                product.getStore(),
+                parseDetails(product.getDetails()),
+                productFeatureRepository.findFeatureDetailsByProductId(id)
+                        .stream()
+                        .map(ProductFeatureResponse::from)
+                        .toList(),
+                productDescriptionRepository.findDescriptionDetailsByProductId(id)
+                        .stream()
+                        .map(ProductDescriptionResponse::from)
+                        .toList(),
+                productCategoryRepository.findCategoryDetailsByProductId(id)
+                        .stream()
+                        .map(ProductCategoryResponse::from)
+                        .toList(),
+                productBoughtTogetherRepository.findBoughtTogetherDetailsByProductId(id)
+                        .stream()
+                        .map(ProductBoughtTogetherResponse::from)
+                        .toList(),
+                productImageRepository.findImageDetailsByProductId(id)
+                        .stream()
+                        .map(ProductImageResponse::from)
+                        .toList(),
+                productVideoRepository.findVideoDetailsByProductId(id)
+                        .stream()
+                        .map(ProductVideoResponse::from)
+                        .toList()
+        );
+    }
+
+    /**
+     * details JSON 문자열을 응답용 map으로 변환한다.
+     */
+    private Map<String, Object> parseDetails(String details) {
+        if (details == null || details.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(details, new TypeReference<>() {
+            });
+        } catch (Exception e) {
+            throw new IllegalStateException("[Product 상세 조회 실패]: details JSON 파싱에 실패했습니다.", e);
+        }
     }
 
     /**

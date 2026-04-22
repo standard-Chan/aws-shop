@@ -1,6 +1,7 @@
 package jeong.awsshop.product.service.productread.dto;
 
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
+import jeong.awsshop.product.repository.projection.ProductImageDetailProjection;
 
 public record ProductImageResponse(
         String variant,
@@ -25,6 +26,18 @@ public record ProductImageResponse(
                 row.getImageThumb(),
                 row.getImageLarge(),
                 row.getImageHiRes()
+        );
+    }
+
+    /**
+     * Product 상세 image projection 값을 응답 DTO로 변환한다.
+     */
+    public static ProductImageResponse from(ProductImageDetailProjection row) {
+        return new ProductImageResponse(
+                row.getVariant(),
+                row.getThumb(),
+                row.getLarge(),
+                row.getHiRes()
         );
     }
 }
