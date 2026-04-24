@@ -2,6 +2,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const path = require('path');
+const { Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 const zlib = require('zlib');
 
@@ -9,6 +10,7 @@ const DATASET_DIR = __dirname;
 const DOWNLOAD_URLS_FILE = path.join(DATASET_DIR, 'meta-download-urls.txt');
 const PROGRESS_FILE = path.join(DATASET_DIR, 'product-stream-upload-progress.json');
 const DEFAULT_UPLOAD_URL = 'http://localhost:8080/api/data-import/upload';
+const PROGRESS_LOG_INTERVAL_MS = 5000;
 
 const uploadBaseUrl = process.env.UPLOAD_URL || DEFAULT_UPLOAD_URL;
 const retryIncomplete = process.argv.includes('--retry-incomplete');
@@ -200,10 +202,20 @@ function createUploadRequest(uploadUrl) {
 async function streamUpload(downloadUrl, uploadUrl) {
   const downloadRes = await createDownloadRequest(downloadUrl);
   const gunzip = zlib.createGunzip();
+  const stats = createTransferStats();
+  const compressedMeter = createByteMeter(stats, 'compressedBytes', 'firstCompressedByteAtMs');
+  const decompressedMeter = createByteMeter(stats, 'decompressedBytes', 'firstDecompressedByteAtMs');
   const uploadReq = createUploadRequest(uploadUrl);
+  const stopProgressLogger = startProgressLogger(stats);
 
-  await pipeline(downloadRes, gunzip, uploadReq);
-  await uploadReq.responsePromise;
+  try {
+    await pipeline(downloadRes, compressedMeter, gunzip, decompressedMeter, uploadReq);
+    await uploadReq.responsePromise;
+    stats.completedAtMs = Date.now();
+    return stats;
+  } finally {
+    stopProgressLogger();
+  }
 }
 
 function shouldSkip(item) {
@@ -256,21 +268,29 @@ async function run() {
     };
     writeProgress(PROGRESS_FILE, progress);
 
-    console.log(`[start] ${index + 1}/${downloadItems.length} line ${item.lineNumber} ${filename}`);
+    console.log(`[start] line=${item.lineNumber} file=${filename} uploadUrl=${uploadUrl}`);
 
     try {
-      await streamUpload(downloadUrl, uploadUrl);
+      const transferStats = await streamUpload(downloadUrl, uploadUrl);
 
       const completedAtMs = Date.now();
+      const summary = buildTransferSummary(transferStats, startedAtMs, completedAtMs);
       progress.items[downloadUrl] = {
         ...progress.items[downloadUrl],
         status: 'completed',
         completedAt: new Date(completedAtMs).toISOString(),
-        durationMs: completedAtMs - startedAtMs,
+        durationMs: summary.totalElapsedMs,
+        compressedBytes: transferStats.compressedBytes,
+        decompressedBytes: transferStats.decompressedBytes,
+        firstCompressedByteDelayMs: summary.firstCompressedDelayMs,
+        firstDecompressedByteDelayMs: summary.firstDecompressedDelayMs,
+        inflateStartupMs: summary.inflateStartupMs,
+        downstreamAfterDecompressMs: summary.downstreamAfterDecompressMs,
+        bottleneckStage: summary.bottleneckStage,
       };
       writeProgress(PROGRESS_FILE, progress);
 
-      console.log(`[done] ${index + 1}/${downloadItems.length} line ${item.lineNumber} ${filename} ${completedAtMs - startedAtMs}ms`);
+      console.log(buildCompletedLog(item.lineNumber, filename, summary, transferStats));
     } catch (error) {
       const failedAtMs = Date.now();
       progress.items[downloadUrl] = {
@@ -304,6 +324,129 @@ function filterDownloadItemsByLineRange(items, lineRange) {
 
     return true;
   });
+}
+
+function createTransferStats() {
+  return {
+    startedAtMs: Date.now(),
+    compressedBytes: 0,
+    decompressedBytes: 0,
+    firstCompressedByteAtMs: null,
+    firstDecompressedByteAtMs: null,
+    completedAtMs: null,
+  };
+}
+
+function createByteMeter(stats, byteField, firstByteField) {
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      if (stats[firstByteField] === null) {
+        stats[firstByteField] = Date.now();
+      }
+      stats[byteField] += chunk.length;
+      callback(null, chunk);
+    },
+  });
+}
+
+function startProgressLogger(stats) {
+  const timer = setInterval(() => {
+    console.log(buildProgressLog(stats));
+  }, PROGRESS_LOG_INTERVAL_MS);
+
+  if (typeof timer.unref === 'function') {
+    timer.unref();
+  }
+
+  return () => clearInterval(timer);
+}
+
+function diffOrNull(startedAtMs, targetAtMs) {
+  return targetAtMs === null ? null : targetAtMs - startedAtMs;
+}
+
+function diffBetweenOrNull(startedAtMs, endedAtMs) {
+  return startedAtMs === null || endedAtMs === null ? null : endedAtMs - startedAtMs;
+}
+
+function buildTransferSummary(stats, startedAtMs, completedAtMs) {
+  const totalElapsedMs = completedAtMs - startedAtMs;
+  const firstCompressedDelayMs = diffOrNull(startedAtMs, stats.firstCompressedByteAtMs);
+  const firstDecompressedDelayMs = diffOrNull(startedAtMs, stats.firstDecompressedByteAtMs);
+  const inflateStartupMs = diffBetweenOrNull(
+    stats.firstCompressedByteAtMs,
+    stats.firstDecompressedByteAtMs,
+  );
+  const downstreamAfterDecompressMs = diffOrNull(stats.firstDecompressedByteAtMs, completedAtMs);
+  const bottleneckStage = estimateBottleneckStage({
+    firstCompressedDelayMs,
+    inflateStartupMs,
+    downstreamAfterDecompressMs,
+  });
+
+  return {
+    totalElapsedMs,
+    firstCompressedDelayMs,
+    firstDecompressedDelayMs,
+    inflateStartupMs,
+    downstreamAfterDecompressMs,
+    bottleneckStage,
+  };
+}
+
+function buildProgressLog(stats) {
+  const summary = buildTransferSummary(stats, stats.startedAtMs, Date.now());
+
+  return `[progress] total=${formatDuration(summary.totalElapsedMs)} | download_wait=${formatOptionalDuration(summary.firstCompressedDelayMs)} | decompress_start=${formatOptionalDuration(summary.inflateStartupMs)} | after_decompress=${formatOptionalDuration(summary.downstreamAfterDecompressMs)} | compressed=${formatBytes(stats.compressedBytes)} @ ${formatRate(stats.compressedBytes, summary.totalElapsedMs)} | decompressed=${formatBytes(stats.decompressedBytes)} @ ${formatRate(stats.decompressedBytes, summary.totalElapsedMs)} | current_bottleneck=${summary.bottleneckStage}`;
+}
+
+function buildCompletedLog(lineNumber, filename, summary, stats) {
+  return `[speed] line=${lineNumber} file=${filename} | total=${formatDuration(summary.totalElapsedMs)} | 1.download_wait=${formatOptionalDuration(summary.firstCompressedDelayMs)} | 2.decompress_start=${formatOptionalDuration(summary.inflateStartupMs)} | 3.after_decompress=${formatOptionalDuration(summary.downstreamAfterDecompressMs)} | compressed=${formatBytes(stats.compressedBytes)} @ ${formatRate(stats.compressedBytes, summary.totalElapsedMs)} | decompressed=${formatBytes(stats.decompressedBytes)} @ ${formatRate(stats.decompressedBytes, summary.totalElapsedMs)} | ratio=${formatCompressionRatio(stats.compressedBytes, stats.decompressedBytes)} | bottleneck=${summary.bottleneckStage}`;
+}
+
+function estimateBottleneckStage(stageDurations) {
+  const candidates = [
+    { name: 'download_wait', durationMs: stageDurations.firstCompressedDelayMs },
+    { name: 'decompress_start', durationMs: stageDurations.inflateStartupMs },
+    { name: 'after_decompress', durationMs: stageDurations.downstreamAfterDecompressMs },
+  ].filter((candidate) => candidate.durationMs !== null);
+
+  if (candidates.length === 0) {
+    return 'unknown';
+  }
+
+  return candidates.reduce((max, current) => (
+    current.durationMs > max.durationMs ? current : max
+  )).name;
+}
+
+function formatDuration(durationMs) {
+  return `${durationMs} ms / ${(durationMs / 1000).toFixed(3)} s / ${(durationMs / 60000).toFixed(2)} min`;
+}
+
+function formatOptionalDuration(durationMs) {
+  return durationMs === null ? 'n/a' : formatDuration(durationMs);
+}
+
+function formatBytes(bytes) {
+  return `${bytes} B / ${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+}
+
+function formatRate(bytes, durationMs) {
+  if (durationMs <= 0) {
+    return 'n/a';
+  }
+
+  const mibPerSecond = (bytes / (1024 * 1024)) / (durationMs / 1000);
+  return `${mibPerSecond.toFixed(2)} MiB/s`;
+}
+
+function formatCompressionRatio(compressedBytes, decompressedBytes) {
+  if (compressedBytes <= 0 || decompressedBytes <= 0) {
+    return 'n/a';
+  }
+
+  return `${(decompressedBytes / compressedBytes).toFixed(2)}x`;
 }
 
 run().catch((error) => {
