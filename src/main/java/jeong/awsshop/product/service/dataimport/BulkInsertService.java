@@ -29,8 +29,10 @@ public class BulkInsertService {
 
     public void bulkInsert(InputStream inputStream) {
         List<ProductDto> buffer = new ArrayList<>();
+        int batchSize = 1500;
 
         String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed_rows.jsonl";
+        int totalProcessed = 0;
 
         try {
             Files.createDirectories(Paths.get(FAILED_ROWS_FILE_PATH).getParent());
@@ -60,19 +62,23 @@ public class BulkInsertService {
                     continue;
                 }
                 buffer.add(productDto);
+                totalProcessed += 1;
 
-                if (buffer.size() >= 100) {
-                    List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer);
+                if (buffer.size() >= batchSize) {
+                    List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer, batchSize);
 
                     // 실패하는 경우 별도 파일에 JSONL 형식으로 저장
                     writeFailedRows(writer, failedBatch);
 
                     buffer.clear(); // 메모리 제거
                 }
+                if (totalProcessed > 0 && totalProcessed % 10000 == 0) {
+                    log.info("[BulkInsert] {} rows completed", totalProcessed);
+                }
             }
 
             if (!buffer.isEmpty()) {
-                List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer);
+                List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer, batchSize);
 
                 writeFailedRows(writer, failedBatch);
 

@@ -27,6 +27,7 @@ public class Product implements Persistable<Long> {
     @Column(name = "parent_asin", nullable = false, unique = true)
     private String parentAsin;
 
+    @Column(name = "title", columnDefinition = "TEXT")
     private String title;
 
     @Column(name = "main_category", nullable = false)

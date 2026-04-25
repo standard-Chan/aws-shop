@@ -25,7 +25,7 @@ public class BulkInsertRepository {
     private final ObjectMapper objectMapper;
     private final SnowflakeIdGenerator idGenerator;
 
-    public List<ProductDto> bulkInsert(List<ProductDto> dtos) {
+    public List<ProductDto> bulkInsert(List<ProductDto> dtos, int batchSize) {
 
         String productSql = """
             INSERT INTO product (
@@ -72,8 +72,6 @@ public class BulkInsertRepository {
                 PreparedStatement videoPs = conn.prepareStatement(videoSql);
                 PreparedStatement boughtTogetherPs = conn.prepareStatement(boughtTogetherSql)
             ) {
-
-                int batchSize = 100;
                 int count = 0;
 
                 for (ProductDto dto : dtos) {
