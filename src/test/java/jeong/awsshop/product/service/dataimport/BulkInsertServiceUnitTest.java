@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class BulkInsertServiceUnitTest {
 
-    private static final String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed_rows.jsonl";
+    private static final String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed-products/failed_rows.jsonl";
 
     private static final String VALID_PRODUCT_JSONL = """
         {"main_category":"Gift Cards","title":"Amazon.com Gift Card","average_rating":4.8,"rating_number":1006,"features":[],"description":[],"price":null,"images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B06ZXTKYHN","bought_together":null}
@@ -84,6 +84,27 @@ class BulkInsertServiceUnitTest {
         bulkInsertService.bulkInsert(inputStream);
 
         // Then: 실패 line은 failed file에 저장되고 정상 line 처리는 계속되어야 한다
+        verify(bulkInsertRepository).bulkInsert(anyList(), anyInt());
+        assertThat(capturedBatches.get(0)).hasSize(2);
+        assertThat(capturedBatches.get(0)).extracting(ProductDto::parentAsin)
+                .containsExactly("B06ZXTKYHN", "B07NTK7T5P");
+
+        String failedJsonl = Files.readString(Paths.get(FAILED_ROWS_FILE_PATH));
+        assertThat(failedJsonl).contains(invalidLine);
+    }
+
+    @Test
+    @DisplayName("숫자 필드 타입 검증 에러가 발생하면 failedBatch에 누적한 뒤 저장하고 다음 line을 계속 처리해야 한다")
+    void should_accumulate_failed_batch_and_continue_when_numeric_field_type_is_invalid() throws Exception {
+        List<List<ProductDto>> capturedBatches = captureSuccessfulBatches();
+        String invalidLine = """
+            {"main_category":"Gift Cards","title":"Invalid price type","average_rating":4.8,"rating_number":1006,"features":[],"description":[],"price":"from 12.50","images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B000TYPE01","bought_together":null}
+            """.strip();
+        String jsonl = VALID_PRODUCT_JSONL + invalidLine + "\n" + SECOND_VALID_PRODUCT_JSONL;
+        InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
+
+        bulkInsertService.bulkInsert(inputStream);
+
         verify(bulkInsertRepository).bulkInsert(anyList(), anyInt());
         assertThat(capturedBatches.get(0)).hasSize(2);
         assertThat(capturedBatches.get(0)).extracting(ProductDto::parentAsin)

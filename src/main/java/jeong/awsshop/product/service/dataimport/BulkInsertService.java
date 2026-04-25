@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import jeong.awsshop.product.exception.dataimport.DataImportInvalidProductTypeException;
 import jeong.awsshop.product.repository.BulkInsertRepository;
 import jeong.awsshop.product.service.dataimport.dto.ProductDto;
 import lombok.AllArgsConstructor;
@@ -28,10 +29,15 @@ public class BulkInsertService {
     private final BulkInsertRepository bulkInsertRepository;
 
     public void bulkInsert(InputStream inputStream) {
+        bulkInsert(inputStream, "failed_rows");
+    }
+
+    public void bulkInsert(InputStream inputStream, String filename) {
         List<ProductDto> buffer = new ArrayList<>();
+        List<String> failedBatchLines = new ArrayList<>();
         int batchSize = 1500;
 
-        String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed_rows.jsonl";
+        String FAILED_ROWS_FILE_PATH = "./aws-dataset/failed-products/" + filename + ".jsonl";
         int totalProcessed = 0;
 
         try {
@@ -57,7 +63,19 @@ public class BulkInsertService {
                     continue;
                 }
 
-                ProductDto productDto = parseLine(writer, line);
+                ProductDto productDto;
+                try {
+                    productDto = parseLine(writer, line);
+                } catch (DataImportInvalidProductTypeException e) {
+                    log.error("[Product DTO 타입 검증 실패]: 실패한 line을 failedBatch에 누적하고 다음 line을 처리합니다. json: {}", line, e);
+                    failedBatchLines.add(line);
+                    continue;
+                } catch (Exception e) {
+                    log.error("[Product DTO 변환 실패]: 실패한 line을 failedBatch에 누적하고 다음 line을 처리합니다. json: {}", line, e);
+                    failedBatchLines.add(line);
+                    continue;
+                }
+
                 if (productDto == null) {
                     continue;
                 }
@@ -65,11 +83,7 @@ public class BulkInsertService {
                 totalProcessed += 1;
 
                 if (buffer.size() >= batchSize) {
-                    List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer, batchSize);
-
-                    // 실패하는 경우 별도 파일에 JSONL 형식으로 저장
-                    writeFailedRows(writer, failedBatch);
-
+                    flushBatch(writer, buffer, failedBatchLines, batchSize);
                     buffer.clear(); // 메모리 제거
                 }
                 if (totalProcessed > 0 && totalProcessed % 10000 == 0) {
@@ -77,11 +91,8 @@ public class BulkInsertService {
                 }
             }
 
-            if (!buffer.isEmpty()) {
-                List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer, batchSize);
-
-                writeFailedRows(writer, failedBatch);
-
+            if (!buffer.isEmpty() || !failedBatchLines.isEmpty()) {
+                flushBatch(writer, buffer, failedBatchLines, batchSize);
                 buffer.clear();
             }
 
@@ -102,12 +113,43 @@ public class BulkInsertService {
         }
 
         try {
+            // parsisng 성공 시
+            validateNumericFieldType(jsonNode, "average_rating");
+            validateNumericFieldType(jsonNode, "rating_number");
+            validateNumericFieldType(jsonNode, "price");
             return objectMapper.treeToValue(jsonNode, ProductDto.class);
         } catch (Exception e) {
+            if (e instanceof DataImportInvalidProductTypeException invalidTypeException) {
+                throw invalidTypeException;
+            }
             log.error("[Product DTO 변환 실패]: 실패한 line을 실패 JSONL에 저장하고 다음 line을 처리합니다. json: {}", line, e);
             writeFailedRow(writer, line);
             return null;
         }
+    }
+
+    private void validateNumericFieldType(JsonNode jsonNode, String fieldName) {
+        JsonNode fieldNode = jsonNode.get(fieldName);
+        if (fieldNode == null || fieldNode.isNull()) {
+            return;
+        }
+        if (!fieldNode.isNumber()) {
+            throw new DataImportInvalidProductTypeException(fieldName, fieldNode);
+        }
+    }
+
+    private void flushBatch(
+        BufferedWriter writer,
+        List<ProductDto> buffer,
+        List<String> failedBatchLines,
+        int batchSize
+    ) throws IOException {
+        if (!buffer.isEmpty()) {
+            List<ProductDto> failedBatch = bulkInsertRepository.bulkInsert(buffer, batchSize);
+            writeFailedRows(writer, failedBatch);
+        }
+        writeFailedRawRows(writer, failedBatchLines);
+        failedBatchLines.clear();
     }
 
     private void writeFailedRow(BufferedWriter writer, String line) throws IOException {
@@ -125,6 +167,17 @@ public class BulkInsertService {
 
         for (ProductDto dto : failedRows) {
             writer.write(objectMapper.writeValueAsString(dto));
+            writer.newLine();
+        }
+    }
+
+    private void writeFailedRawRows(BufferedWriter writer, List<String> failedRows) throws IOException {
+        if (failedRows == null || failedRows.isEmpty()) {
+            return;
+        }
+
+        for (String failedRow : failedRows) {
+            writer.write(failedRow);
             writer.newLine();
         }
     }
