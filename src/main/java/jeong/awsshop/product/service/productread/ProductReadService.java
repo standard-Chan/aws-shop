@@ -2,13 +2,12 @@ package jeong.awsshop.product.service.productread;
 
 import java.math.BigDecimal;
 import java.util.List;
-import jeong.awsshop.product.domain.MainCategory;
+import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
 import jeong.awsshop.product.exception.productread.MissingCategoryCursorIdException;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorNotFoundException;
 import jeong.awsshop.product.exception.productread.ProductNotFoundException;
-import jeong.awsshop.product.exception.productread.UnknownProductCategoryException;
 import jeong.awsshop.product.repository.ProductBoughtTogetherRepository;
 import jeong.awsshop.product.repository.ProductCategoryRepository;
 import jeong.awsshop.product.repository.ProductDescriptionRepository;
@@ -60,13 +59,19 @@ public class ProductReadService {
             boolean averageRating,
             boolean ratingNumber
     ) {
-        MainCategory category = parseCategory(mainCategory);
+        String normalizedCategory = normalizeCategory(mainCategory);
 
         boolean sortByAverageRating = shouldSortByAverageRating(averageRating, ratingNumber);
-        validateCursor(category, cursorId, cursorAverageRating, cursorRatingNumber, sortByAverageRating);
+        validateCursor(
+                normalizedCategory,
+                cursorId,
+                cursorAverageRating,
+                cursorRatingNumber,
+                sortByAverageRating
+        );
 
         List<ProductSummaryNativeProjection> rows = findCategoryProductSummaries(
-                category,
+                normalizedCategory,
                 cursorId,
                 cursorAverageRating,
                 cursorRatingNumber,
@@ -108,7 +113,7 @@ public class ProductReadService {
      * 선택된 정렬 기준에 맞는 category 상품 목록 조회 쿼리를 호출한다.
      */
     private List<ProductSummaryNativeProjection> findCategoryProductSummaries(
-            MainCategory category,
+            String mainCategory,
             Long cursorId,
             BigDecimal cursorAverageRating,
             Integer cursorRatingNumber,
@@ -117,14 +122,14 @@ public class ProductReadService {
     ) {
         if (sortByAverageRating) {
             return productRepository.findCategoryProductSummariesOrderByAverageRating(
-                    category,
+                    mainCategory,
                     cursorId,
                     cursorAverageRating,
                     limit
             );
         }
         return productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                category,
+                mainCategory,
                 cursorId,
                 cursorRatingNumber,
                 limit
@@ -139,21 +144,17 @@ public class ProductReadService {
     }
 
     /**
-     * query parameter로 받은 category 문자열을 도메인 enum으로 변환한다.
+     * query parameter의 category를 저장 포맷과 같은 문자열로 정규화한다.
      */
-    private MainCategory parseCategory(String mainCategory) {
-        MainCategory category = MainCategory.fromQueryParam(mainCategory);
-        if (category == MainCategory.UNKNOWN) {
-            throw new UnknownProductCategoryException();
-        }
-        return category;
+    private String normalizeCategory(String mainCategory) {
+        return MainCategoryNormalizer.normalize(mainCategory);
     }
 
     /**
      * cursor 조합과 cursor 상품의 category 일치 여부를 검증한다.
      */
     private void validateCursor(
-            MainCategory mainCategory,
+            String mainCategory,
             Long cursorId,
             BigDecimal cursorAverageRating,
             Integer cursorRatingNumber,
@@ -199,7 +200,7 @@ public class ProductReadService {
     /**
      * cursorId가 실제 상품이고 요청 category에 속한 상품인지 검증한다.
      */
-    private void validateCursorProduct(MainCategory mainCategory, Long cursorId) {
+    private void validateCursorProduct(String mainCategory, Long cursorId) {
         if (!productRepository.existsById(cursorId)) {
             throw new ProductCategoryCursorNotFoundException();
         }

@@ -8,7 +8,6 @@ import static jeong.awsshop.common.json.JsonNodeValues.isBlank;
 import static jeong.awsshop.common.json.JsonNodeValues.longValue;
 import static jeong.awsshop.common.json.JsonNodeValues.text;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.domain.Product;
 import jeong.awsshop.product.domain.ProductBoughtTogether;
 import jeong.awsshop.product.domain.ProductCategory;
@@ -164,8 +163,8 @@ public class DataImportProductAssembler {
                 text(node.get(DataImportJsonKey.RELATED_PRODUCT_IMAGE_URL.value()))));
     }
 
-    private MainCategory mapMainCategory(String value) {
-        return MainCategory.fromDisplayName(value);
+    private String mapMainCategory(String value) {
+        return MainCategoryNormalizer.normalize(value);
     }
 
     private String fieldText(JsonNode rootNode, DataImportJsonKey fieldName) {

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.projection.ProductBoughtTogetherDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductCategoryDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductDescriptionDetailProjection;
@@ -18,7 +17,7 @@ public record ProductDetailResponse(
         Long id,
         String parentAsin,
         String title,
-        MainCategory mainCategory,
+        String mainCategory,
         BigDecimal averageRating,
         Integer ratingNumber,
         BigDecimal price,
@@ -50,7 +49,7 @@ public record ProductDetailResponse(
                 product.getId(),
                 product.getParentAsin(),
                 product.getTitle(),
-                MainCategory.valueOf(product.getMainCategory()),
+                product.getMainCategory(),
                 product.getAverageRating(),
                 product.getRatingNumber(),
                 product.getPrice(),

@@ -1,14 +1,13 @@
 package jeong.awsshop.product.service.productread.dto;
 
 import java.math.BigDecimal;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 
 public record ProductSummaryResponse(
         Long id,
         String parentAsin,
         String title,
-        MainCategory mainCategory,
+        String mainCategory,
         BigDecimal averageRating,
         Integer ratingNumber,
         BigDecimal price,
@@ -24,7 +23,7 @@ public record ProductSummaryResponse(
                 row.getId(),
                 row.getParentAsin(),
                 row.getTitle(),
-                MainCategory.valueOf(row.getMainCategory()),
+                row.getMainCategory(),
                 row.getAverageRating(),
                 row.getRatingNumber(),
                 row.getPrice(),

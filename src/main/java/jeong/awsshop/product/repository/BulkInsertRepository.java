@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
-import jeong.awsshop.product.domain.MainCategory;
+import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
 import jeong.awsshop.product.service.dataimport.dto.ProductDto;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -186,7 +186,7 @@ public class BulkInsertRepository {
     }
 
     private String mapMainCategory(String rawMainCategory) {
-        return MainCategory.fromDisplayName(rawMainCategory).name();
+        return MainCategoryNormalizer.normalize(rawMainCategory);
     }
 
     private String serializeDetails(ProductDto dto) {

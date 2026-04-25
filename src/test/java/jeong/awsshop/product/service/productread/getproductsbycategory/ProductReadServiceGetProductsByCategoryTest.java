@@ -156,12 +156,18 @@ class ProductReadServiceGetProductsByCategoryTest {
     }
 
     @Test
-    @DisplayName("알 수 없는 category 값이면 400 예외를 던져야 한다")
-    void should_throw_bad_request_when_category_is_invalid() {
-        // Given: enum name도 하이픈 표시명도 아닌 category
+    @DisplayName("예상하지 못한 category도 정규화해서 조회에 사용해야 한다")
+    void should_normalize_unknown_category_and_use_it_for_query() {
+        // Given: 사전에 정의되지 않은 category 문자열
+        when(productRepository.findCategoryProductSummariesOrderByAverageRating(
+                "NOT_A_CATEGORY",
+                null,
+                null,
+                2
+        )).thenReturn(List.of());
 
-        // When & Then: service는 400으로 매핑 가능한 예외를 던져야 한다
-        assertThatThrownBy(() -> productReadService.getProductsByCategory(
+        // When: 하이픈이 포함된 category로 조회한다
+        productReadService.getProductsByCategory(
                 "Not-A-Category",
                 1,
                 null,
@@ -169,7 +175,15 @@ class ProductReadServiceGetProductsByCategoryTest {
                 null,
                 true,
                 false
-        )).isInstanceOf(ResponseStatusException.class);
+        );
+
+        // Then: service는 category를 정규화한 뒤 repository에 전달해야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
+                "NOT_A_CATEGORY",
+                null,
+                null,
+                2
+        );
     }
 
     @Test

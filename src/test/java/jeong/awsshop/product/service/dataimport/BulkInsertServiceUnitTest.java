@@ -3,6 +3,7 @@ package jeong.awsshop.product.service.dataimport;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +60,7 @@ class BulkInsertServiceUnitTest {
         bulkInsertService.bulkInsert(inputStream);
 
         // Then: 실패 line은 failed file에 저장되고 정상 line 처리는 계속되어야 한다
-        verify(bulkInsertRepository).bulkInsert(anyList());
+        verify(bulkInsertRepository).bulkInsert(anyList(), anyInt());
         assertThat(capturedBatches.get(0)).hasSize(2);
         assertThat(capturedBatches.get(0)).extracting(ProductDto::parentAsin)
                 .containsExactly("B06ZXTKYHN", "B07NTK7T5P");
@@ -83,7 +84,7 @@ class BulkInsertServiceUnitTest {
         bulkInsertService.bulkInsert(inputStream);
 
         // Then: 실패 line은 failed file에 저장되고 정상 line 처리는 계속되어야 한다
-        verify(bulkInsertRepository).bulkInsert(anyList());
+        verify(bulkInsertRepository).bulkInsert(anyList(), anyInt());
         assertThat(capturedBatches.get(0)).hasSize(2);
         assertThat(capturedBatches.get(0)).extracting(ProductDto::parentAsin)
                 .containsExactly("B06ZXTKYHN", "B07NTK7T5P");
@@ -94,7 +95,7 @@ class BulkInsertServiceUnitTest {
 
     private List<List<ProductDto>> captureSuccessfulBatches() {
         List<List<ProductDto>> capturedBatches = new ArrayList<>();
-        when(bulkInsertRepository.bulkInsert(anyList()))
+        when(bulkInsertRepository.bulkInsert(anyList(), anyInt()))
                 .thenAnswer(invocation -> {
                     List<ProductDto> batch = invocation.getArgument(0);
                     capturedBatches.add(new ArrayList<>(batch));

@@ -3,7 +3,6 @@ package jeong.awsshop.product.repository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.domain.Product;
 import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
@@ -79,7 +78,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("limit") int limit
     );
 
-    boolean existsByIdAndMainCategory(Long id, MainCategory mainCategory);
+    boolean existsByIdAndMainCategory(Long id, String mainCategory);
 
     @Query(value = """
             SELECT
@@ -106,7 +105,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     p.price,
                     p.store
                 FROM product p
-                WHERE p.main_category = :#{#mainCategory.name()}
+                WHERE p.main_category = :mainCategory
                   AND p.average_rating IS NOT NULL
                   AND (
                       :cursorId IS NULL
@@ -129,7 +128,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             ORDER BY p.average_rating DESC, p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByAverageRating(
-            @Param("mainCategory") MainCategory mainCategory,
+            @Param("mainCategory") String mainCategory,
             @Param("cursorId") Long cursorId,
             @Param("cursorAverageRating") BigDecimal cursorAverageRating,
             @Param("limit") int limit
@@ -160,7 +159,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     p.price,
                     p.store
                 FROM product p
-                WHERE p.main_category = :#{#mainCategory.name()}
+                WHERE p.main_category = :mainCategory
                   AND p.rating_number IS NOT NULL
                   AND (
                       :cursorId IS NULL
@@ -183,7 +182,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             ORDER BY p.rating_number DESC, p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByRatingNumber(
-            @Param("mainCategory") MainCategory mainCategory,
+            @Param("mainCategory") String mainCategory,
             @Param("cursorId") Long cursorId,
             @Param("cursorRatingNumber") Integer cursorRatingNumber,
             @Param("limit") int limit
