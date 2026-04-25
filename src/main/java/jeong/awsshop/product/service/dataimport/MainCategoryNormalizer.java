@@ -7,7 +7,7 @@ public final class MainCategoryNormalizer {
 
     public static String normalize(String value) {
         if (value == null) {
-            return null;
+            return "UNKNOWN";
         }
 
         String normalized = value.trim()
@@ -16,6 +16,6 @@ public final class MainCategoryNormalizer {
                 .toUpperCase()
                 .replace(' ', '_');
 
-        return normalized.isBlank() ? null : normalized;
+        return normalized.isBlank() ? "UNKNOWN" : normalized;
     }
 }
