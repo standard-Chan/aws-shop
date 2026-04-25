@@ -2,6 +2,7 @@ package jeong.awsshop.product.service.dataimport;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -116,7 +117,7 @@ public class BulkInsertService {
             // parsisng 성공 시
             validateNumericFieldType(jsonNode, "average_rating");
             validateNumericFieldType(jsonNode, "rating_number");
-            validateNumericFieldType(jsonNode, "price");
+            validateAndNormalizePrice(jsonNode);
             return objectMapper.treeToValue(jsonNode, ProductDto.class);
         } catch (Exception e) {
             if (e instanceof DataImportInvalidProductTypeException invalidTypeException) {
@@ -135,6 +136,34 @@ public class BulkInsertService {
         }
         if (!fieldNode.isNumber()) {
             throw new DataImportInvalidProductTypeException(fieldName, fieldNode);
+        }
+    }
+
+    private void validateAndNormalizePrice(JsonNode jsonNode) {
+        JsonNode priceNode = jsonNode.get("price");
+        if (priceNode == null || priceNode.isNull()) {
+            return;
+        }
+        if (priceNode.isNumber()) {
+            return;
+        }
+        if (!priceNode.isTextual()) {
+            throw new DataImportInvalidProductTypeException("price", priceNode);
+        }
+
+        String normalizedPrice = priceNode.asText().trim();
+        if (normalizedPrice.isEmpty() || "—".equals(normalizedPrice)) {
+            ((ObjectNode) jsonNode).putNull("price");
+            return;
+        }
+        if (normalizedPrice.startsWith("from ")) {
+            normalizedPrice = normalizedPrice.substring("from ".length()).trim();
+        }
+
+        try {
+            ((ObjectNode) jsonNode).put("price", objectMapper.getNodeFactory().numberNode(new java.math.BigDecimal(normalizedPrice)));
+        } catch (NumberFormatException e) {
+            throw new DataImportInvalidProductTypeException("price", priceNode);
         }
     }
 

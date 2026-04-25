@@ -98,7 +98,7 @@ class BulkInsertServiceUnitTest {
     void should_accumulate_failed_batch_and_continue_when_numeric_field_type_is_invalid() throws Exception {
         List<List<ProductDto>> capturedBatches = captureSuccessfulBatches();
         String invalidLine = """
-            {"main_category":"Gift Cards","title":"Invalid price type","average_rating":4.8,"rating_number":1006,"features":[],"description":[],"price":"from 12.50","images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B000TYPE01","bought_together":null}
+            {"main_category":"Gift Cards","title":"Invalid average rating type","average_rating":"not-valid-rating","rating_number":1006,"features":[],"description":[],"price":null,"images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B000TYPE01","bought_together":null}
             """.strip();
         String jsonl = VALID_PRODUCT_JSONL + invalidLine + "\n" + SECOND_VALID_PRODUCT_JSONL;
         InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
@@ -112,6 +112,30 @@ class BulkInsertServiceUnitTest {
 
         String failedJsonl = Files.readString(Paths.get(FAILED_ROWS_FILE_PATH));
         assertThat(failedJsonl).contains(invalidLine);
+    }
+
+    @Test
+    @DisplayName("price가 em dash면 null로 정규화하고 from 접두사는 제거한 숫자로 변환해야 한다")
+    void should_normalize_price_before_dto_conversion() throws Exception {
+        List<List<ProductDto>> capturedBatches = captureSuccessfulBatches();
+        String dashPriceLine = """
+            {"main_category":"Gift Cards","title":"Dash price","average_rating":4.8,"rating_number":1006,"features":[],"description":[],"price":"—","images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B000DASH01","bought_together":null}
+            """.strip();
+        String fromPriceLine = """
+            {"main_category":"Gift Cards","title":"From price","average_rating":4.8,"rating_number":1006,"features":[],"description":[],"price":"from 17.25","images":[],"videos":[],"store":"Amazon","categories":[],"details":{},"parent_asin":"B000FROM01","bought_together":null}
+            """.strip();
+        String jsonl = dashPriceLine + "\n" + fromPriceLine;
+        InputStream inputStream = new ByteArrayInputStream(jsonl.getBytes(UTF_8));
+
+        bulkInsertService.bulkInsert(inputStream);
+
+        verify(bulkInsertRepository).bulkInsert(anyList(), anyInt());
+        assertThat(capturedBatches.get(0)).hasSize(2);
+        assertThat(capturedBatches.get(0).get(0).price()).isNull();
+        assertThat(capturedBatches.get(0).get(1).price()).hasToString("17.25");
+
+        String failedJsonl = Files.readString(Paths.get(FAILED_ROWS_FILE_PATH));
+        assertThat(failedJsonl).isEmpty();
     }
 
     private List<List<ProductDto>> captureSuccessfulBatches() {
