@@ -43,10 +43,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 p.rating_number AS ratingNumber,
                 p.price AS price,
                 p.store AS store,
-                ri.variant AS imageVariant,
-                ri.thumb AS imageThumb,
-                ri.large AS imageLarge,
-                ri.hi_res AS imageHiRes
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
             FROM (
                 SELECT
                     p.id,
@@ -62,30 +62,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 ORDER BY p.id ASC
                 LIMIT :limit
             ) p
-            LEFT JOIN (
-                SELECT
-                    ranked.product_id,
-                    ranked.variant,
-                    ranked.thumb,
-                    ranked.large,
-                    ranked.hi_res
-                FROM (
-                    SELECT
-                        pi.product_id,
-                        pi.variant,
-                        pi.thumb,
-                        pi.large,
-                        pi.hi_res,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY pi.product_id
-                            ORDER BY
-                                CASE WHEN pi.variant = 'MAIN' THEN 0 ELSE 1 END,
-                                pi.id ASC
-                        ) AS rn
-                    FROM product_images pi
-                ) ranked
-                WHERE ranked.rn = 1
-            ) ri ON ri.product_id = p.id
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
             ORDER BY p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findProductSummaries(
@@ -105,10 +91,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 p.rating_number AS ratingNumber,
                 p.price AS price,
                 p.store AS store,
-                ri.variant AS imageVariant,
-                ri.thumb AS imageThumb,
-                ri.large AS imageLarge,
-                ri.hi_res AS imageHiRes
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
             FROM (
                 SELECT
                     p.id,
@@ -130,30 +116,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 ORDER BY p.average_rating DESC, p.id ASC
                 LIMIT :limit
             ) p
-            LEFT JOIN (
-                SELECT
-                    ranked.product_id,
-                    ranked.variant,
-                    ranked.thumb,
-                    ranked.large,
-                    ranked.hi_res
-                FROM (
-                    SELECT
-                        pi.product_id,
-                        pi.variant,
-                        pi.thumb,
-                        pi.large,
-                        pi.hi_res,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY pi.product_id
-                            ORDER BY
-                                CASE WHEN pi.variant = 'MAIN' THEN 0 ELSE 1 END,
-                                pi.id ASC
-                        ) AS rn
-                    FROM product_images pi
-                ) ranked
-                WHERE ranked.rn = 1
-            ) ri ON ri.product_id = p.id
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
             ORDER BY p.average_rating DESC, p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByAverageRating(
@@ -173,10 +145,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 p.rating_number AS ratingNumber,
                 p.price AS price,
                 p.store AS store,
-                ri.variant AS imageVariant,
-                ri.thumb AS imageThumb,
-                ri.large AS imageLarge,
-                ri.hi_res AS imageHiRes
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
             FROM (
                 SELECT
                     p.id,
@@ -198,30 +170,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                 ORDER BY p.rating_number DESC, p.id ASC
                 LIMIT :limit
             ) p
-            LEFT JOIN (
-                SELECT
-                    ranked.product_id,
-                    ranked.variant,
-                    ranked.thumb,
-                    ranked.large,
-                    ranked.hi_res
-                FROM (
-                    SELECT
-                        pi.product_id,
-                        pi.variant,
-                        pi.thumb,
-                        pi.large,
-                        pi.hi_res,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY pi.product_id
-                            ORDER BY
-                                CASE WHEN pi.variant = 'MAIN' THEN 0 ELSE 1 END,
-                                pi.id ASC
-                        ) AS rn
-                    FROM product_images pi
-                ) ranked
-                WHERE ranked.rn = 1
-            ) ri ON ri.product_id = p.id
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
             ORDER BY p.rating_number DESC, p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByRatingNumber(
