@@ -67,11 +67,14 @@ public class ReviewBulkInsertRepository {
                 log.info("[Bulk Insert] 유니크 키가 중복되어 insert 를 skip합니다.");
                 return new ArrayList<>();
             }
+
+            // 그 외 SQL 예외는 로그를 남기고 실패한 batch를 반환하여 재처리할 수 있도록 한다
+            log.error("[Review Bulk Insert 실패]: 데이터베이스 오류가 발생했습니다.", e);
+            return reviews;
         } catch (Exception e) {
             log.error("[Review Bulk Insert 실패]: batch insert 중 오류가 발생했습니다.", e);
             return reviews;
         }
-        return new ArrayList<>();
     }
 
     private void addReviewBatch(PreparedStatement reviewPs, ReviewDto dto, long reviewId) throws SQLException {
