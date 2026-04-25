@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.dataimport.BulkInsertService;
@@ -63,7 +62,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // When: Handmade category만 조회한다
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         null,
                         null,
                         20
@@ -84,7 +83,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // When: averageRating 기준 첫 페이지를 조회한다
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         null,
                         null,
                         20
@@ -107,7 +106,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // Given: averageRating 첫 페이지에서 두 번째 row를 cursor로 선택한다
         List<ProductSummaryNativeProjection> firstPage =
                 productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         null,
                         null,
                         20
@@ -117,7 +116,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // When: cursor 이후 averageRating 페이지를 조회한다
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findCategoryProductSummariesOrderByAverageRating(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         cursor.getId(),
                         cursor.getAverageRating(),
                         20
@@ -141,7 +140,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // When: ratingNumber 기준 첫 페이지를 조회한다
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         null,
                         null,
                         20
@@ -164,7 +163,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // Given: ratingNumber 첫 페이지에서 두 번째 row를 cursor로 선택한다
         List<ProductSummaryNativeProjection> firstPage =
                 productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         null,
                         null,
                         20
@@ -174,7 +173,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
         // When: cursor 이후 ratingNumber 페이지를 조회한다
         List<ProductSummaryNativeProjection> rows =
                 productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                        MainCategory.HANDMADE,
+                        "HANDMADE",
                         cursor.getId(),
                         cursor.getRatingNumber(),
                         20

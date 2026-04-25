@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import jeong.awsshop.product.controller.ProductController;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.exception.productread.ProductNotFoundException;
 import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductBoughtTogetherResponse;
@@ -110,7 +109,7 @@ class ProductControllerGetProductDetailTest {
                 productId,
                 "B07NK78DVV",
                 "Psychedelic Swirls Key Fob",
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 new BigDecimal("4.9"),
                 14,
                 new BigDecimal("17.99"),

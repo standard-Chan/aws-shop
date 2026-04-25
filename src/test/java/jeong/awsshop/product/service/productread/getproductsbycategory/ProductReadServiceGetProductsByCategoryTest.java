@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.ProductReadService;
@@ -35,7 +34,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_call_average_rating_repository_when_average_rating_sort_is_requested() {
         // Given: averageRating 정렬 첫 페이지 요청과 repository 응답
         when(productRepository.findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3
@@ -54,7 +53,7 @@ class ProductReadServiceGetProductsByCategoryTest {
 
         // Then: averageRating repository 메서드와 응답 DTO가 사용되어야 한다
         verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3
@@ -67,7 +66,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_call_rating_number_repository_when_rating_number_sort_is_requested() {
         // Given: ratingNumber 정렬 첫 페이지 요청과 repository 응답
         when(productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3
@@ -86,7 +85,7 @@ class ProductReadServiceGetProductsByCategoryTest {
 
         // Then: ratingNumber repository 메서드와 응답 DTO가 사용되어야 한다
         verify(productRepository).findCategoryProductSummariesOrderByRatingNumber(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3
@@ -99,7 +98,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_prioritize_average_rating_when_both_sort_options_are_true() {
         // Given: 두 정렬 옵션이 모두 true인 요청
         when(productRepository.findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 2
@@ -118,7 +117,7 @@ class ProductReadServiceGetProductsByCategoryTest {
 
         // Then: averageRating repository 메서드가 우선 호출되어야 한다
         verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 2
@@ -130,7 +129,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_use_average_rating_sort_when_sort_options_are_absent() {
         // Given: 정렬 옵션이 모두 false인 요청
         when(productRepository.findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 2
@@ -149,7 +148,7 @@ class ProductReadServiceGetProductsByCategoryTest {
 
         // Then: averageRating repository 메서드가 기본으로 호출되어야 한다
         verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 2
@@ -232,7 +231,7 @@ class ProductReadServiceGetProductsByCategoryTest {
         // Given: cursor id는 존재하지만 요청 category와 일치하지 않는다
         Long cursorId = 101L;
         when(productRepository.existsById(cursorId)).thenReturn(true);
-        when(productRepository.existsByIdAndMainCategory(cursorId, MainCategory.HANDMADE))
+        when(productRepository.existsByIdAndMainCategory(cursorId, "HANDMADE"))
                 .thenReturn(false);
 
         // When & Then: 다른 category cursor는 400 예외로 처리해야 한다
@@ -252,7 +251,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_return_average_rating_cursor_when_average_rating_sort_has_next() {
         // Given: size + 1개 row로 다음 페이지가 있는 상황
         when(productRepository.findCategoryProductSummariesOrderByAverageRating(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3
@@ -286,7 +285,7 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_return_rating_number_cursor_when_rating_number_sort_has_next() {
         // Given: size + 1개 row로 다음 페이지가 있는 상황
         when(productRepository.findCategoryProductSummariesOrderByRatingNumber(
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 null,
                 null,
                 3

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.ProductReadService;
@@ -180,7 +179,7 @@ class ProductReadServiceGetProductsTest {
         assertThat(product.id()).isEqualTo(101L);
         assertThat(product.parentAsin()).isEqualTo("A-001");
         assertThat(product.title()).isEqualTo("Product A");
-        assertThat(product.mainCategory()).isEqualTo(MainCategory.HANDMADE);
+        assertThat(product.mainCategory()).isEqualTo("HANDMADE");
         assertThat(product.averageRating()).isEqualByComparingTo("4.5");
         assertThat(product.ratingNumber()).isEqualTo(12);
         assertThat(product.price()).isEqualByComparingTo("19.99");

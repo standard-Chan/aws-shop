@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.util.List;
 import jeong.awsshop.product.controller.ProductController;
-import jeong.awsshop.product.domain.MainCategory;
 import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductImageResponse;
@@ -77,7 +76,7 @@ class ProductControllerGetProductsTest {
                 101L,
                 "B07NTK7T5P",
                 "Daisy Keychain Wristlet Gray Fabric Key fob Lanyard",
-                MainCategory.HANDMADE,
+                "HANDMADE",
                 new BigDecimal("4.5"),
                 12,
                 null,
