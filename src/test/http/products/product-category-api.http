@@ -1,29 +1,49 @@
-### category 기본 조회 - averageRating 기본 정렬
+### category 기본 조회 - averageRating 기본 정렬(desc)
 
-GET http://localhost:8080/api/products/category?mainCategory=SUBSCRIPTION_boxes&size=20
+GET http://localhost:8080/api/products/category?mainCategory=AMAZON_FASHION&size=20
 Accept: application/json
 
-### category 조회 - averageRating 정렬
+### category 조회 - averageRating 정렬(desc)
 
-GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&averageRating=true
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=averageRating&order=desc
 Accept: application/json
 
 ### category 조회 - averageRating cursor 기반 다음 페이지
 
-GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&averageRating=true&cursorId=321689502437347350&cursorAverageRating=4.5
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=averageRating&order=desc&cursorId=323413198692683853
 Accept: application/json
 
-### category 조회 - ratingNumber 정렬
+### category 조회 - ratingNumber 정렬(desc)
 
-GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&ratingNumber=true
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=ratingNumber&order=desc
 Accept: application/json
 
 ### category 조회 - ratingNumber cursor 기반 다음 페이지
 
-GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&ratingNumber=true&cursorId=321689502437347350&cursorRatingNumber=12
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=ratingNumber&order=desc&cursorId=323413198919176251
 Accept: application/json
 
-### category 조회 - 하이픈 연결 query param
+### category 조회 - price 정렬(asc)
 
-GET http://localhost:8080/api/products/category?mainCategory=Gift-Cards&size=20&averageRating=true
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=price&order=asc
+Accept: application/json
+
+### category 조회 - price cursor 기반 다음 페이지(asc)
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=price&order=asc&cursorId=323413441303810444
+Accept: application/json
+
+### category 조회 - price 정렬(desc)
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=price&order=desc
+Accept: application/json
+
+### category 조회 - price cursor 기반 다음 페이지(desc)
+
+GET http://localhost:8080/api/products/category?mainCategory=HANDMADE&size=20&sort=price&order=desc&cursorId=323413366951383211
+Accept: application/json
+
+### category 조회 - 하이픈 연결 및 대소문자 query param
+
+GET http://localhost:8080/api/products/category?mainCategory=all_ELECTRONICS&size=20&sort=averageRating&order=desc
 Accept: application/json
