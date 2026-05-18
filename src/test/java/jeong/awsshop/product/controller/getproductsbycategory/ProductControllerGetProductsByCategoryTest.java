@@ -5,7 +5,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.math.BigDecimal;
 import java.util.List;
 import jeong.awsshop.product.controller.ProductController;
 import jeong.awsshop.product.service.productread.ProductReadService;
@@ -36,15 +35,12 @@ class ProductControllerGetProductsByCategoryTest {
                 20,
                 null,
                 null,
-                null,
-                true,
-                false
+                null
         )).thenReturn(new ProductCategoryCursorResponse(List.of(), null, false));
 
         // When: size 없이 category 목록 API를 호출한다
         mockMvc.perform(get("/api/products/category")
-                        .param("mainCategory", "HANDMADE")
-                        .param("averageRating", "true"))
+                        .param("mainCategory", "HANDMADE"))
                 .andExpect(status().isOk());
 
         // Then: controller는 기본 size 20과 query parameter를 service에 전달해야 한다
@@ -53,31 +49,26 @@ class ProductControllerGetProductsByCategoryTest {
                 20,
                 null,
                 null,
-                null,
-                true,
-                false
+                null
         );
     }
 
     @Test
     @DisplayName("category 조회 요청이면 category, cursor, 정렬 parameter를 service에 전달해야 한다")
     void should_call_service_with_category_cursor_and_sort_parameters_when_category_request_is_valid() throws Exception {
-        // Given: averageRating cursor 요청과 service 응답을 준비한다
+        // Given: averageRating 내림차순 cursor 요청과 service 응답을 준비한다
         Long cursorId = 9_000_000_000_000L;
-        BigDecimal cursorAverageRating = new BigDecimal("4.5");
         ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
                 List.of(),
-                new CategoryCursor(cursorId, cursorAverageRating, null),
+                new CategoryCursor(cursorId, null, null, null),
                 false
         );
         when(productReadService.getProductsByCategory(
                 "Gift-Cards",
                 10,
                 cursorId,
-                cursorAverageRating,
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         )).thenReturn(response);
 
         // When: category cursor parameter를 포함해 목록 API를 호출한다
@@ -85,9 +76,8 @@ class ProductControllerGetProductsByCategoryTest {
                         .param("mainCategory", "Gift-Cards")
                         .param("size", "10")
                         .param("cursorId", String.valueOf(cursorId))
-                        .param("cursorAverageRating", "4.5")
-                        .param("averageRating", "true")
-                        .param("ratingNumber", "false"))
+                        .param("sort", "averageRating")
+                        .param("order", "desc"))
                 .andExpect(status().isOk());
 
         // Then: controller는 받은 값을 그대로 ProductReadService에 전달해야 한다
@@ -95,43 +85,36 @@ class ProductControllerGetProductsByCategoryTest {
                 "Gift-Cards",
                 10,
                 cursorId,
-                cursorAverageRating,
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         );
     }
 
     @Test
-    @DisplayName("category price ASC 조회 요청이면 sort, direction, cursorPrice를 service에 전달해야 한다")
-    void should_call_service_with_price_sort_and_asc_direction_when_category_request_is_valid() throws Exception {
+    @DisplayName("category price ASC 조회 요청이면 sort, order, cursorId를 service에 전달해야 한다")
+    void should_call_service_with_price_sort_and_asc_order_when_category_request_is_valid() throws Exception {
         // Given: price ASC cursor 요청과 service 응답을 준비한다
         Long cursorId = 9_000_000_000_000L;
-        BigDecimal cursorPrice = new BigDecimal("19.99");
         ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
                 List.of(),
-                new CategoryCursor(cursorId, null, null, cursorPrice),
+                new CategoryCursor(cursorId, null, null, null),
                 false
         );
         when(productReadService.getProductsByCategory(
                 "Gift-Cards",
                 10,
                 cursorId,
-                null,
-                null,
-                cursorPrice,
                 "price",
                 "asc"
         )).thenReturn(response);
 
-        // When: price ASC cursor parameter를 포함해 목록 API를 호출한다
+        // When: price ASC cursorId를 포함해 목록 API를 호출한다
         mockMvc.perform(get("/api/products/category")
                         .param("mainCategory", "Gift-Cards")
                         .param("size", "10")
                         .param("cursorId", String.valueOf(cursorId))
-                        .param("cursorPrice", "19.99")
                         .param("sort", "price")
-                        .param("direction", "asc"))
+                        .param("order", "asc"))
                 .andExpect(status().isOk());
 
         // Then: controller는 받은 sort 계약을 ProductReadService에 전달해야 한다
@@ -139,9 +122,6 @@ class ProductControllerGetProductsByCategoryTest {
                 "Gift-Cards",
                 10,
                 cursorId,
-                null,
-                null,
-                cursorPrice,
                 "price",
                 "asc"
         );

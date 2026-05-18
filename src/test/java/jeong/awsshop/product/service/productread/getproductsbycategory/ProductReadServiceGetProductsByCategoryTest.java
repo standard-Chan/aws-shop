@@ -45,10 +45,8 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 2,
                 null,
-                null,
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         );
 
         // Then: averageRating repository 메서드와 응답 DTO가 사용되어야 한다
@@ -77,10 +75,8 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 2,
                 null,
-                null,
-                null,
-                false,
-                true
+                "ratingNumber",
+                "desc"
         );
 
         // Then: ratingNumber repository 메서드와 응답 DTO가 사용되어야 한다
@@ -108,9 +104,6 @@ class ProductReadServiceGetProductsByCategoryTest {
         productReadService.getProductsByCategory(
                 "HANDMADE",
                 2,
-                null,
-                null,
-                null,
                 null,
                 "price",
                 "asc"
@@ -141,9 +134,6 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 2,
                 null,
-                null,
-                null,
-                null,
                 "price",
                 "desc"
         );
@@ -154,37 +144,6 @@ class ProductReadServiceGetProductsByCategoryTest {
                 null,
                 null,
                 3
-        );
-    }
-
-    @Test
-    @DisplayName("두 정렬 옵션이 모두 true이면 averageRating을 우선해야 한다")
-    void should_prioritize_average_rating_when_both_sort_options_are_true() {
-        // Given: 두 정렬 옵션이 모두 true인 요청
-        when(productRepository.findCategoryProductSummariesOrderByAverageRating(
-                "HANDMADE",
-                null,
-                null,
-                2
-        )).thenReturn(List.of());
-
-        // When: category 상품을 조회한다
-        productReadService.getProductsByCategory(
-                "HANDMADE",
-                1,
-                null,
-                null,
-                null,
-                true,
-                true
-        );
-
-        // Then: averageRating repository 메서드가 우선 호출되어야 한다
-        verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
-                "HANDMADE",
-                null,
-                null,
-                2
         );
     }
 
@@ -204,9 +163,6 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 1,
                 null,
-                null,
-                null,
-                null,
                 "ratingNumber,averageRating,price",
                 "desc"
         );
@@ -221,9 +177,9 @@ class ProductReadServiceGetProductsByCategoryTest {
     }
 
     @Test
-    @DisplayName("정렬 옵션이 없으면 averageRating을 기본 정렬로 사용해야 한다")
-    void should_use_average_rating_sort_when_sort_options_are_absent() {
-        // Given: 정렬 옵션이 모두 false인 요청
+    @DisplayName("sort가 없으면 averageRating을 기본 정렬로 사용해야 한다")
+    void should_use_average_rating_sort_when_sort_is_absent() {
+        // Given: sort 없이 조회하는 요청
         when(productRepository.findCategoryProductSummariesOrderByAverageRating(
                 "HANDMADE",
                 null,
@@ -237,9 +193,7 @@ class ProductReadServiceGetProductsByCategoryTest {
                 1,
                 null,
                 null,
-                null,
-                false,
-                false
+                null
         );
 
         // Then: averageRating repository 메서드가 기본으로 호출되어야 한다
@@ -267,10 +221,8 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "Not-A-Category",
                 1,
                 null,
-                null,
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         );
 
         // Then: service는 category를 정규화한 뒤 repository에 전달해야 한다
@@ -283,47 +235,13 @@ class ProductReadServiceGetProductsByCategoryTest {
     }
 
     @Test
-    @DisplayName("cursorId만 있고 averageRating cursor 값이 없으면 400 예외를 던져야 한다")
-    void should_throw_bad_request_when_cursor_id_exists_without_sort_cursor_value() {
-        // Given: averageRating 정렬에서 cursorId만 있는 잘못된 요청
-
-        // When & Then: cursor 값 조합 오류를 400 예외로 처리해야 한다
-        assertThatThrownBy(() -> productReadService.getProductsByCategory(
-                "HANDMADE",
-                1,
-                101L,
-                null,
-                null,
-                true,
-                false
-        )).isInstanceOf(ResponseStatusException.class);
-    }
-
-    @Test
-    @DisplayName("정렬 cursor 값만 있고 cursorId가 없으면 400 예외를 던져야 한다")
-    void should_throw_bad_request_when_sort_cursor_value_exists_without_cursor_id() {
-        // Given: cursorAverageRating만 있는 잘못된 요청
-
-        // When & Then: cursor 값 조합 오류를 400 예외로 처리해야 한다
-        assertThatThrownBy(() -> productReadService.getProductsByCategory(
-                "HANDMADE",
-                1,
-                null,
-                new BigDecimal("4.5"),
-                null,
-                true,
-                false
-        )).isInstanceOf(ResponseStatusException.class);
-    }
-
-    @Test
-    @DisplayName("price 정렬에서 cursorId와 cursorPrice가 있으면 price ASC repository에 cursor를 전달해야 한다")
-    void should_pass_price_cursor_to_price_asc_repository_when_price_cursor_exists() {
-        // Given: price ASC cursor 요청과 repository 응답
+    @DisplayName("price 정렬에서 cursorId가 있으면 cursor 상품의 price를 조회해 repository에 전달해야 한다")
+    void should_pass_cursor_product_price_to_price_asc_repository_when_cursor_id_exists() {
+        // Given: price ASC cursor 요청과 cursor 상품 조회 결과
         Long cursorId = 101L;
         BigDecimal cursorPrice = new BigDecimal("19.99");
-        when(productRepository.existsById(cursorId)).thenReturn(true);
-        when(productRepository.existsByIdAndMainCategory(cursorId, "HANDMADE")).thenReturn(true);
+        when(productRepository.findDetailById(cursorId))
+                .thenReturn(java.util.Optional.of(cursorProjection(cursorId, "HANDMADE", null, null, cursorPrice)));
         when(productRepository.findCategoryProductSummariesOrderByPriceAsc(
                 "HANDMADE",
                 cursorId,
@@ -336,9 +254,6 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 1,
                 cursorId,
-                null,
-                null,
-                cursorPrice,
                 "price",
                 "asc"
         );
@@ -353,18 +268,18 @@ class ProductReadServiceGetProductsByCategoryTest {
     }
 
     @Test
-    @DisplayName("price 정렬에서 cursorPrice만 있고 cursorId가 없으면 400 예외를 던져야 한다")
-    void should_throw_bad_request_when_cursor_price_exists_without_cursor_id_for_price_sort() {
-        // Given: price 정렬에서 cursorPrice만 있는 잘못된 요청
+    @DisplayName("price 정렬에서 cursor 상품의 price가 null이면 400 예외를 던져야 한다")
+    void should_throw_bad_request_when_cursor_product_price_is_null_for_price_sort() {
+        // Given: cursor 상품은 존재하지만 price 값이 없다
+        Long cursorId = 101L;
+        when(productRepository.findDetailById(cursorId))
+                .thenReturn(java.util.Optional.of(cursorProjection(cursorId, "HANDMADE", null, null, null)));
 
-        // When & Then: cursor 값 조합 오류를 400 예외로 처리해야 한다
+        // When & Then: price 정렬에 필요한 cursor 값이 없으므로 400 예외를 던져야 한다
         assertThatThrownBy(() -> productReadService.getProductsByCategory(
                 "HANDMADE",
                 1,
-                null,
-                null,
-                null,
-                new BigDecimal("19.99"),
+                cursorId,
                 "price",
                 "asc"
         )).isInstanceOf(ResponseStatusException.class);
@@ -375,17 +290,15 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_throw_bad_request_when_cursor_id_does_not_exist() {
         // Given: 존재하지 않는 cursor id
         Long cursorId = 9_999_999_999_999L;
-        when(productRepository.existsById(cursorId)).thenReturn(false);
+        when(productRepository.findDetailById(cursorId)).thenReturn(java.util.Optional.empty());
 
         // When & Then: 존재하지 않는 cursor는 400 예외로 처리해야 한다
         assertThatThrownBy(() -> productReadService.getProductsByCategory(
                 "HANDMADE",
                 1,
                 cursorId,
-                new BigDecimal("4.5"),
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         )).isInstanceOf(ResponseStatusException.class);
     }
 
@@ -394,19 +307,16 @@ class ProductReadServiceGetProductsByCategoryTest {
     void should_throw_bad_request_when_cursor_category_is_different() {
         // Given: cursor id는 존재하지만 요청 category와 일치하지 않는다
         Long cursorId = 101L;
-        when(productRepository.existsById(cursorId)).thenReturn(true);
-        when(productRepository.existsByIdAndMainCategory(cursorId, "HANDMADE"))
-                .thenReturn(false);
+        when(productRepository.findDetailById(cursorId))
+                .thenReturn(java.util.Optional.of(cursorProjection(cursorId, "GIFT_CARDS", new BigDecimal("4.5"), 12, new BigDecimal("19.99"))));
 
         // When & Then: 다른 category cursor는 400 예외로 처리해야 한다
         assertThatThrownBy(() -> productReadService.getProductsByCategory(
                 "HANDMADE",
                 1,
                 cursorId,
-                new BigDecimal("4.5"),
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         )).isInstanceOf(ResponseStatusException.class);
     }
 
@@ -430,10 +340,8 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 2,
                 null,
-                null,
-                null,
-                true,
-                false
+                "averageRating",
+                "desc"
         );
 
         // Then: 응답 마지막 상품 기준으로 averageRating cursor를 만들어야 한다
@@ -464,10 +372,8 @@ class ProductReadServiceGetProductsByCategoryTest {
                 "HANDMADE",
                 2,
                 null,
-                null,
-                null,
-                false,
-                true
+                "ratingNumber",
+                "desc"
         );
 
         // Then: 응답 마지막 상품 기준으로 ratingNumber cursor를 만들어야 한다
@@ -497,9 +403,6 @@ class ProductReadServiceGetProductsByCategoryTest {
         ProductCategoryCursorResponse response = productReadService.getProductsByCategory(
                 "HANDMADE",
                 2,
-                null,
-                null,
-                null,
                 null,
                 "price",
                 "asc"
@@ -545,6 +448,26 @@ class ProductReadServiceGetProductsByCategoryTest {
             public String getImageThumb() { return "main-thumb"; }
             public String getImageLarge() { return "main-large"; }
             public String getImageHiRes() { return "main-hires"; }
+        };
+    }
+
+    private jeong.awsshop.product.repository.projection.ProductDetailProjection cursorProjection(
+            Long id,
+            String mainCategory,
+            BigDecimal averageRating,
+            Integer ratingNumber,
+            BigDecimal price
+    ) {
+        return new jeong.awsshop.product.repository.projection.ProductDetailProjection() {
+            public Long getId() { return id; }
+            public String getParentAsin() { return "CURSOR"; }
+            public String getTitle() { return "Cursor Product"; }
+            public String getMainCategory() { return mainCategory; }
+            public BigDecimal getAverageRating() { return averageRating; }
+            public Integer getRatingNumber() { return ratingNumber; }
+            public BigDecimal getPrice() { return price; }
+            public String getStore() { return "Cursor Store"; }
+            public String getDetails() { return "{}"; }
         };
     }
 }
