@@ -94,6 +94,70 @@ class ProductReadServiceGetProductsByCategoryTest {
     }
 
     @Test
+    @DisplayName("price ASC 정렬 요청이면 price ASC repository 메서드를 호출해야 한다")
+    void should_call_price_asc_repository_when_price_sort_and_asc_direction_are_requested() {
+        // Given: price ASC 첫 페이지 요청과 repository 응답
+        when(productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(projection(101L, "A-001", "Product A")));
+
+        // When: category 상품을 price ASC 기준으로 조회한다
+        productReadService.getProductsByCategory(
+                "HANDMADE",
+                2,
+                null,
+                null,
+                null,
+                null,
+                "price",
+                "asc"
+        );
+
+        // Then: price ASC repository 메서드가 호출되어야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByPriceAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        );
+    }
+
+    @Test
+    @DisplayName("price DESC 정렬 요청이면 price DESC repository 메서드를 호출해야 한다")
+    void should_call_price_desc_repository_when_price_sort_and_desc_direction_are_requested() {
+        // Given: price DESC 첫 페이지 요청과 repository 응답
+        when(productRepository.findCategoryProductSummariesOrderByPriceDesc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(projection(101L, "A-001", "Product A")));
+
+        // When: category 상품을 price DESC 기준으로 조회한다
+        productReadService.getProductsByCategory(
+                "HANDMADE",
+                2,
+                null,
+                null,
+                null,
+                null,
+                "price",
+                "desc"
+        );
+
+        // Then: price DESC repository 메서드가 호출되어야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByPriceDesc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        );
+    }
+
+    @Test
     @DisplayName("두 정렬 옵션이 모두 true이면 averageRating을 우선해야 한다")
     void should_prioritize_average_rating_when_both_sort_options_are_true() {
         // Given: 두 정렬 옵션이 모두 true인 요청
@@ -117,6 +181,38 @@ class ProductReadServiceGetProductsByCategoryTest {
 
         // Then: averageRating repository 메서드가 우선 호출되어야 한다
         verify(productRepository).findCategoryProductSummariesOrderByAverageRating(
+                "HANDMADE",
+                null,
+                null,
+                2
+        );
+    }
+
+    @Test
+    @DisplayName("정렬 기준이 여러 개 들어오면 ratingNumber를 우선해야 한다")
+    void should_prioritize_rating_number_when_multiple_sort_values_are_requested() {
+        // Given: ratingNumber, averageRating, price가 함께 들어온 요청
+        when(productRepository.findCategoryProductSummariesOrderByRatingNumber(
+                "HANDMADE",
+                null,
+                null,
+                2
+        )).thenReturn(List.of());
+
+        // When: category 상품을 다중 sort 기준으로 조회한다
+        productReadService.getProductsByCategory(
+                "HANDMADE",
+                1,
+                null,
+                null,
+                null,
+                null,
+                "ratingNumber,averageRating,price",
+                "desc"
+        );
+
+        // Then: 우선순위가 가장 높은 ratingNumber repository만 호출되어야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByRatingNumber(
                 "HANDMADE",
                 null,
                 null,
@@ -217,6 +313,60 @@ class ProductReadServiceGetProductsByCategoryTest {
                 null,
                 true,
                 false
+        )).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    @DisplayName("price 정렬에서 cursorId와 cursorPrice가 있으면 price ASC repository에 cursor를 전달해야 한다")
+    void should_pass_price_cursor_to_price_asc_repository_when_price_cursor_exists() {
+        // Given: price ASC cursor 요청과 repository 응답
+        Long cursorId = 101L;
+        BigDecimal cursorPrice = new BigDecimal("19.99");
+        when(productRepository.existsById(cursorId)).thenReturn(true);
+        when(productRepository.existsByIdAndMainCategory(cursorId, "HANDMADE")).thenReturn(true);
+        when(productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                "HANDMADE",
+                cursorId,
+                cursorPrice,
+                2
+        )).thenReturn(List.of());
+
+        // When: category 상품을 price ASC cursor 기준으로 조회한다
+        productReadService.getProductsByCategory(
+                "HANDMADE",
+                1,
+                cursorId,
+                null,
+                null,
+                cursorPrice,
+                "price",
+                "asc"
+        );
+
+        // Then: repository는 price cursor 값을 그대로 받아야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByPriceAsc(
+                "HANDMADE",
+                cursorId,
+                cursorPrice,
+                2
+        );
+    }
+
+    @Test
+    @DisplayName("price 정렬에서 cursorPrice만 있고 cursorId가 없으면 400 예외를 던져야 한다")
+    void should_throw_bad_request_when_cursor_price_exists_without_cursor_id_for_price_sort() {
+        // Given: price 정렬에서 cursorPrice만 있는 잘못된 요청
+
+        // When & Then: cursor 값 조합 오류를 400 예외로 처리해야 한다
+        assertThatThrownBy(() -> productReadService.getProductsByCategory(
+                "HANDMADE",
+                1,
+                null,
+                null,
+                null,
+                new BigDecimal("19.99"),
+                "price",
+                "asc"
         )).isInstanceOf(ResponseStatusException.class);
     }
 
@@ -328,6 +478,42 @@ class ProductReadServiceGetProductsByCategoryTest {
         assertThat(nextCursor.ratingNumber()).isEqualTo(12);
     }
 
+    @Test
+    @DisplayName("price 정렬 응답이면 nextCursor에 id와 price만 포함해야 한다")
+    void should_return_price_cursor_when_price_sort_has_next() {
+        // Given: size + 1개 row로 다음 페이지가 있는 상황
+        when(productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(
+                projectionWithPrice(101L, "A-001", "Product A", "10.00"),
+                projectionWithPrice(102L, "A-002", "Product B", "19.99"),
+                projectionWithPrice(103L, "A-003", "Product C", "30.00")
+        ));
+
+        // When: price 기준 category 상품을 조회한다
+        ProductCategoryCursorResponse response = productReadService.getProductsByCategory(
+                "HANDMADE",
+                2,
+                null,
+                null,
+                null,
+                null,
+                "price",
+                "asc"
+        );
+
+        // Then: 응답 마지막 상품 기준으로 price cursor를 만들어야 한다
+        CategoryCursor nextCursor = response.nextCursor();
+        assertThat(response.hasNext()).isTrue();
+        assertThat(nextCursor.id()).isEqualTo(102L);
+        assertThat(nextCursor.averageRating()).isNull();
+        assertThat(nextCursor.ratingNumber()).isNull();
+        assertThat(nextCursor.price()).isEqualByComparingTo("19.99");
+    }
+
     private ProductSummaryNativeProjection projection(Long id, String parentAsin, String title) {
         return new ProductSummaryNativeProjection() {
             public Long getId() { return id; }
@@ -337,6 +523,23 @@ class ProductReadServiceGetProductsByCategoryTest {
             public BigDecimal getAverageRating() { return new BigDecimal("4.5"); }
             public Integer getRatingNumber() { return 12; }
             public BigDecimal getPrice() { return new BigDecimal("19.99"); }
+            public String getStore() { return "Fixture Store"; }
+            public String getImageVariant() { return "MAIN"; }
+            public String getImageThumb() { return "main-thumb"; }
+            public String getImageLarge() { return "main-large"; }
+            public String getImageHiRes() { return "main-hires"; }
+        };
+    }
+
+    private ProductSummaryNativeProjection projectionWithPrice(Long id, String parentAsin, String title, String price) {
+        return new ProductSummaryNativeProjection() {
+            public Long getId() { return id; }
+            public String getParentAsin() { return parentAsin; }
+            public String getTitle() { return title; }
+            public String getMainCategory() { return "HANDMADE"; }
+            public BigDecimal getAverageRating() { return new BigDecimal("4.5"); }
+            public Integer getRatingNumber() { return 12; }
+            public BigDecimal getPrice() { return new BigDecimal(price); }
             public String getStore() { return "Fixture Store"; }
             public String getImageVariant() { return "MAIN"; }
             public String getImageThumb() { return "main-thumb"; }

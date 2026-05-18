@@ -42,6 +42,11 @@ class ProductRepositoryFindCategoryProductSummariesTest {
             {"main_category":"Handmade","title":"Cursor Fixture 01","average_rating":4.0,"rating_number":10,"price":1.00,"images":[{"thumb":"cursor-01-main-thumb","large":"cursor-01-main-large","variant":"MAIN","hi_res":null}],"store":"Cursor Store","parent_asin":"RED_CURSOR_01","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
             {"main_category":"Handmade","title":"Cursor Fixture 02","average_rating":4.0,"rating_number":10,"price":2.00,"images":[{"thumb":"cursor-02-main-thumb","large":"cursor-02-main-large","variant":"MAIN","hi_res":null}],"store":"Cursor Store","parent_asin":"RED_CURSOR_02","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
             {"main_category":"Handmade","title":"Cursor Fixture 03","average_rating":4.0,"rating_number":10,"price":3.00,"images":[{"thumb":"cursor-03-main-thumb","large":"cursor-03-main-large","variant":"MAIN","hi_res":null}],"store":"Cursor Store","parent_asin":"RED_CURSOR_03","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
+            {"main_category":"Handmade","title":"Null Price Product","average_rating":4.6,"rating_number":50,"price":null,"images":[{"thumb":"null-main-thumb","large":"null-main-large","variant":"MAIN","hi_res":null}],"store":"Fixture Store","parent_asin":"PRICE_NULL","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
+            {"main_category":"Handmade","title":"Zero Price Product","average_rating":4.4,"rating_number":40,"price":0.00,"images":[{"thumb":"zero-main-thumb","large":"zero-main-large","variant":"MAIN","hi_res":null}],"store":"Fixture Store","parent_asin":"PRICE_ZERO","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
+            {"main_category":"Handmade","title":"Low Price Product","average_rating":4.3,"rating_number":30,"price":5.00,"images":[{"thumb":"low-main-thumb","large":"low-main-large","variant":"MAIN","hi_res":null}],"store":"Fixture Store","parent_asin":"PRICE_LOW","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
+            {"main_category":"Handmade","title":"Same Low Price Product","average_rating":4.2,"rating_number":20,"price":5.00,"images":[{"thumb":"same-low-main-thumb","large":"same-low-main-large","variant":"MAIN","hi_res":null}],"store":"Fixture Store","parent_asin":"PRICE_SAME_LOW","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
+            {"main_category":"Handmade","title":"High Price Product","average_rating":4.1,"rating_number":10,"price":99.99,"images":[{"thumb":"high-main-thumb","large":"high-main-large","variant":"MAIN","hi_res":null}],"store":"Fixture Store","parent_asin":"PRICE_HIGH","features":[],"description":[],"categories":[],"details":{},"videos":[],"bought_together":null}
             """;
 
     @BeforeAll
@@ -76,7 +81,7 @@ class ProductRepositoryFindCategoryProductSummariesTest {
     }
 
     @Test
-    @DisplayName("averageRating 첫 페이지는 average_rating DESC, id ASC로 조회해야 한다")
+    @DisplayName("averageRating 및 정렬을 average_rating DESC로 한 경우, id ASC로 조회해야 한다")
     void should_find_products_ordered_by_average_rating_desc_and_id_asc_when_cursor_is_null() {
         // Given: 같은 category 안에 서로 다른 averageRating과 같은 averageRating 상품이 있다
 
@@ -133,6 +138,25 @@ class ProductRepositoryFindCategoryProductSummariesTest {
     }
 
     @Test
+    @DisplayName("averageRating 정렬에서는 price NULL 상품도 조회해야 한다")
+    void should_include_null_price_products_when_sorting_by_average_rating() {
+        // Given: Handmade category 안에 price가 NULL인 상품이 있다
+
+        // When: averageRating 기준 첫 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByAverageRating(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: price NULL 상품도 averageRating 정렬 대상에는 포함되어야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getParentAsin)
+                .contains("PRICE_NULL");
+    }
+
+    @Test
     @DisplayName("ratingNumber 첫 페이지는 rating_number DESC, id ASC로 조회해야 한다")
     void should_find_products_ordered_by_rating_number_desc_and_id_asc_when_cursor_is_null() {
         // Given: 같은 category 안에 서로 다른 ratingNumber와 같은 ratingNumber 상품이 있다
@@ -186,6 +210,130 @@ class ProductRepositoryFindCategoryProductSummariesTest {
             boolean sameRatingNumberAndGreaterId = row.getRatingNumber().equals(cursor.getRatingNumber())
                     && row.getId() > cursor.getId();
             assertThat(lowerRatingNumber || sameRatingNumberAndGreaterId).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("price ASC 첫 페이지는 price NULL을 제외하고 price ASC, id ASC로 조회해야 한다")
+    void should_find_products_ordered_by_price_asc_and_id_asc_when_cursor_is_null() {
+        // Given: 같은 category 안에 null, 0, 양수 price 상품이 있다
+
+        // When: price ASC 기준 첫 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: price NULL 상품은 제외하고, price 0 상품은 포함해야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getParentAsin)
+                .doesNotContain("PRICE_NULL")
+                .contains("PRICE_ZERO");
+
+        // Then: price는 오름차순이어야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getPrice)
+                .isSortedAccordingTo(BigDecimal::compareTo);
+
+        // Then: 같은 price 5.00 상품은 id 오름차순이어야 한다
+        assertThat(rows.stream()
+                .filter(row -> row.getPrice().compareTo(new BigDecimal("5.00")) == 0)
+                .map(ProductSummaryNativeProjection::getId)
+                .toList()).isSorted();
+    }
+
+    @Test
+    @DisplayName("price DESC 첫 페이지는 price NULL을 제외하고 price DESC, id ASC로 조회해야 한다")
+    void should_find_products_ordered_by_price_desc_and_id_asc_when_cursor_is_null() {
+        // Given: 같은 category 안에 null, 0, 양수 price 상품이 있다
+
+        // When: price DESC 기준 첫 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByPriceDesc(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: price NULL 상품은 제외하고, price 0 상품은 포함해야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getParentAsin)
+                .doesNotContain("PRICE_NULL")
+                .contains("PRICE_ZERO");
+
+        // Then: price는 내림차순이어야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getPrice)
+                .isSortedAccordingTo((left, right) -> right.compareTo(left));
+
+        // Then: 같은 price 5.00 상품은 id 오름차순이어야 한다
+        assertThat(rows.stream()
+                .filter(row -> row.getPrice().compareTo(new BigDecimal("5.00")) == 0)
+                .map(ProductSummaryNativeProjection::getId)
+                .toList()).isSorted();
+    }
+
+    @Test
+    @DisplayName("price ASC cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
+    void should_find_next_products_by_price_asc_cursor_when_cursor_exists() {
+        // Given: price ASC 첫 페이지에서 두 번째 row를 cursor로 선택한다
+        List<ProductSummaryNativeProjection> firstPage =
+                productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+        ProductSummaryNativeProjection cursor = firstPage.get(1);
+
+        // When: cursor 이후 price ASC 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                        "HANDMADE",
+                        cursor.getId(),
+                        cursor.getPrice(),
+                        20
+                );
+
+        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다
+        assertThat(rows).isNotEmpty();
+        assertThat(rows).allSatisfy(row -> {
+            boolean higherPrice = row.getPrice().compareTo(cursor.getPrice()) > 0;
+            boolean samePriceAndGreaterId = row.getPrice().compareTo(cursor.getPrice()) == 0
+                    && row.getId() > cursor.getId();
+            assertThat(higherPrice || samePriceAndGreaterId).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("price DESC cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
+    void should_find_next_products_by_price_desc_cursor_when_cursor_exists() {
+        // Given: price DESC 첫 페이지에서 두 번째 row를 cursor로 선택한다
+        List<ProductSummaryNativeProjection> firstPage =
+                productRepository.findCategoryProductSummariesOrderByPriceDesc(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+        ProductSummaryNativeProjection cursor = firstPage.get(1);
+
+        // When: cursor 이후 price DESC 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByPriceDesc(
+                        "HANDMADE",
+                        cursor.getId(),
+                        cursor.getPrice(),
+                        20
+                );
+
+        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다
+        assertThat(rows).isNotEmpty();
+        assertThat(rows).allSatisfy(row -> {
+            boolean lowerPrice = row.getPrice().compareTo(cursor.getPrice()) < 0;
+            boolean samePriceAndGreaterId = row.getPrice().compareTo(cursor.getPrice()) == 0
+                    && row.getId() > cursor.getId();
+            assertThat(lowerPrice || samePriceAndGreaterId).isTrue();
         });
     }
 

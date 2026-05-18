@@ -103,6 +103,51 @@ class ProductControllerGetProductsByCategoryTest {
     }
 
     @Test
+    @DisplayName("category price ASC 조회 요청이면 sort, direction, cursorPrice를 service에 전달해야 한다")
+    void should_call_service_with_price_sort_and_asc_direction_when_category_request_is_valid() throws Exception {
+        // Given: price ASC cursor 요청과 service 응답을 준비한다
+        Long cursorId = 9_000_000_000_000L;
+        BigDecimal cursorPrice = new BigDecimal("19.99");
+        ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
+                List.of(),
+                new CategoryCursor(cursorId, null, null, cursorPrice),
+                false
+        );
+        when(productReadService.getProductsByCategory(
+                "Gift-Cards",
+                10,
+                cursorId,
+                null,
+                null,
+                cursorPrice,
+                "price",
+                "asc"
+        )).thenReturn(response);
+
+        // When: price ASC cursor parameter를 포함해 목록 API를 호출한다
+        mockMvc.perform(get("/api/products/category")
+                        .param("mainCategory", "Gift-Cards")
+                        .param("size", "10")
+                        .param("cursorId", String.valueOf(cursorId))
+                        .param("cursorPrice", "19.99")
+                        .param("sort", "price")
+                        .param("direction", "asc"))
+                .andExpect(status().isOk());
+
+        // Then: controller는 받은 sort 계약을 ProductReadService에 전달해야 한다
+        verify(productReadService).getProductsByCategory(
+                "Gift-Cards",
+                10,
+                cursorId,
+                null,
+                null,
+                cursorPrice,
+                "price",
+                "asc"
+        );
+    }
+
+    @Test
     @DisplayName("category 조회에서 size가 최대값 100보다 크면 400 Bad Request를 반환해야 한다")
     void should_return_bad_request_when_category_size_is_greater_than_max() throws Exception {
         // Given: 최대 size를 초과한 category 조회 요청
