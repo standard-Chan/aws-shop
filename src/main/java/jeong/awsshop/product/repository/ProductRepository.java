@@ -187,4 +187,112 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("cursorRatingNumber") Integer cursorRatingNumber,
             @Param("limit") int limit
     );
+
+    @Query(value = """
+            SELECT
+                p.id AS id,
+                p.parent_asin AS parentAsin,
+                p.title AS title,
+                p.main_category AS mainCategory,
+                p.average_rating AS averageRating,
+                p.rating_number AS ratingNumber,
+                p.price AS price,
+                p.store AS store,
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
+            FROM (
+                SELECT
+                    p.id,
+                    p.parent_asin,
+                    p.title,
+                    p.main_category,
+                    p.average_rating,
+                    p.rating_number,
+                    p.price,
+                    p.store
+                FROM product p
+                WHERE p.main_category = :mainCategory
+                  AND p.price IS NOT NULL
+                  AND (
+                      :cursorId IS NULL
+                      OR p.price > :cursorPrice
+                      OR (p.price = :cursorPrice AND p.id > :cursorId)
+                  )
+                ORDER BY p.price ASC, p.id ASC
+                LIMIT :limit
+            ) p
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
+            ORDER BY p.price ASC, p.id ASC
+            """, nativeQuery = true)
+    List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByPriceAsc(
+            @Param("mainCategory") String mainCategory,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorPrice") BigDecimal cursorPrice,
+            @Param("limit") int limit
+    );
+
+    @Query(value = """
+            SELECT
+                p.id AS id,
+                p.parent_asin AS parentAsin,
+                p.title AS title,
+                p.main_category AS mainCategory,
+                p.average_rating AS averageRating,
+                p.rating_number AS ratingNumber,
+                p.price AS price,
+                p.store AS store,
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
+            FROM (
+                SELECT
+                    p.id,
+                    p.parent_asin,
+                    p.title,
+                    p.main_category,
+                    p.average_rating,
+                    p.rating_number,
+                    p.price,
+                    p.store
+                FROM product p
+                WHERE p.main_category = :mainCategory
+                  AND p.price IS NOT NULL
+                  AND (
+                      :cursorId IS NULL
+                      OR p.price < :cursorPrice
+                      OR (p.price = :cursorPrice AND p.id > :cursorId)
+                  )
+                ORDER BY p.price DESC, p.id ASC
+                LIMIT :limit
+            ) p
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
+            ORDER BY p.price DESC, p.id ASC
+            """, nativeQuery = true)
+    List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByPriceDesc(
+            @Param("mainCategory") String mainCategory,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorPrice") BigDecimal cursorPrice,
+            @Param("limit") int limit
+    );
 }
