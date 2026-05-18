@@ -10,12 +10,13 @@ public record ProductCategoryCursorResponse(
 ) {
 
     /**
-     * category cursor 조회 결과를 정렬 기준에 맞는 cursor 응답으로 조립한다.
+     * sort 문자열 기준으로 category cursor 응답을 조립한다.
      */
     public static ProductCategoryCursorResponse from(
             List<ProductSummaryNativeProjection> rows,
             int size,
-            boolean averageRatingSort
+            String sort,
+            String direction
     ) {
         boolean hasNext = rows.size() > size;
         List<ProductSummaryResponse> products = rows.stream()
@@ -25,18 +26,21 @@ public record ProductCategoryCursorResponse(
 
         CategoryCursor nextCursor = products.isEmpty()
                 ? null
-                : cursorFrom(products.getLast(), averageRatingSort);
+                : cursorFrom(products.getLast(), sort);
 
         return new ProductCategoryCursorResponse(products, nextCursor, hasNext);
     }
 
     /**
-     * 정렬 기준에 맞는 cursor 응답을 선택한다.
+     * price 정렬이 아니면 기존 정렬 기준 이름으로 cursor 응답을 선택한다.
      */
-    private static CategoryCursor cursorFrom(ProductSummaryResponse product, boolean averageRatingSort) {
-        if (averageRatingSort) {
-            return CategoryCursor.averageRatingCursor(product);
+    private static CategoryCursor cursorFrom(ProductSummaryResponse product, String sort) {
+        if ("price".equalsIgnoreCase(sort)) {
+            return CategoryCursor.priceCursor(product);
         }
-        return CategoryCursor.ratingNumberCursor(product);
+        if ("ratingNumber".equalsIgnoreCase(sort)) {
+            return CategoryCursor.ratingNumberCursor(product);
+        }
+        return CategoryCursor.averageRatingCursor(product);
     }
 }

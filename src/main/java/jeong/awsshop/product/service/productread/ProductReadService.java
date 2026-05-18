@@ -3,7 +3,6 @@ package jeong.awsshop.product.service.productread;
 import java.math.BigDecimal;
 import java.util.List;
 import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
-import jeong.awsshop.product.exception.productread.MissingCategoryCursorIdException;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorNotFoundException;
@@ -54,32 +53,29 @@ public class ProductReadService {
             String mainCategory,
             int size,
             Long cursorId,
-            BigDecimal cursorAverageRating,
-            Integer cursorRatingNumber,
-            boolean averageRating,
-            boolean ratingNumber
+            String sort,
+            String order
     ) {
         String normalizedCategory = normalizeCategory(mainCategory);
+        String selectedSort = selectSort(sort);
+        String selectedOrder = selectOrder(order);
+        ProductDetailProjection cursorProduct = findCursorProduct(normalizedCategory, cursorId);
 
-        boolean sortByAverageRating = shouldSortByAverageRating(averageRating, ratingNumber);
         validateCursor(
-                normalizedCategory,
-                cursorId,
-                cursorAverageRating,
-                cursorRatingNumber,
-                sortByAverageRating
+                cursorProduct,
+                selectedSort
         );
 
         List<ProductSummaryNativeProjection> rows = findCategoryProductSummaries(
                 normalizedCategory,
                 cursorId,
-                cursorAverageRating,
-                cursorRatingNumber,
-                sortByAverageRating,
+                cursorProduct,
+                selectedSort,
+                selectedOrder,
                 queryLimitForHasNext(size)
         );
 
-        return ProductCategoryCursorResponse.from(rows, size, sortByAverageRating);
+        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedOrder);
     }
 
     /**
@@ -103,35 +99,44 @@ public class ProductReadService {
     }
 
     /**
-     * averageRating 요청이 있거나 정렬 옵션이 없으면 averageRating 정렬을 선택한다.
-     */
-    private boolean shouldSortByAverageRating(boolean averageRating, boolean ratingNumber) {
-        return averageRating || !ratingNumber;
-    }
-
-    /**
-     * 선택된 정렬 기준에 맞는 category 상품 목록 조회 쿼리를 호출한다.
+     * sort / order 조합에 따라 필요한 category 조회 쿼리를 호출한다.
      */
     private List<ProductSummaryNativeProjection> findCategoryProductSummaries(
             String mainCategory,
             Long cursorId,
-            BigDecimal cursorAverageRating,
-            Integer cursorRatingNumber,
-            boolean sortByAverageRating,
+            ProductDetailProjection cursorProduct,
+            String sort,
+            String order,
             int limit
     ) {
-        if (sortByAverageRating) {
-            return productRepository.findCategoryProductSummariesOrderByAverageRating(
+        if ("ratingNumber".equals(sort)) {
+            return productRepository.findCategoryProductSummariesOrderByRatingNumber(
                     mainCategory,
                     cursorId,
-                    cursorAverageRating,
+                    cursorProduct == null ? null : cursorProduct.getRatingNumber(),
                     limit
             );
         }
-        return productRepository.findCategoryProductSummariesOrderByRatingNumber(
+        if ("price".equals(sort)) {
+            if ("asc".equals(order)) {
+                return productRepository.findCategoryProductSummariesOrderByPriceAsc(
+                        mainCategory,
+                        cursorId,
+                        cursorProduct == null ? null : cursorProduct.getPrice(),
+                        limit
+                );
+            }
+            return productRepository.findCategoryProductSummariesOrderByPriceDesc(
+                    mainCategory,
+                    cursorId,
+                    cursorProduct == null ? null : cursorProduct.getPrice(),
+                    limit
+            );
+        }
+        return productRepository.findCategoryProductSummariesOrderByAverageRating(
                 mainCategory,
                 cursorId,
-                cursorRatingNumber,
+                cursorProduct == null ? null : cursorProduct.getAverageRating(),
                 limit
         );
     }
@@ -151,61 +156,67 @@ public class ProductReadService {
     }
 
     /**
-     * cursor 조합과 cursor 상품의 category 일치 여부를 검증한다.
+     * sort 문자열 기준으로 필요한 cursor 조합과 cursor 상품 일치 여부를 검증한다.
      */
     private void validateCursor(
-            String mainCategory,
-            Long cursorId,
-            BigDecimal cursorAverageRating,
-            Integer cursorRatingNumber,
-            boolean sortByAverageRating
+            ProductDetailProjection cursorProduct,
+            String sort
     ) {
-        boolean sortCursorValueExists = hasSortCursorValue(
-                cursorAverageRating,
-                cursorRatingNumber,
-                sortByAverageRating
-        );
-        validateCursorPair(cursorId, sortCursorValueExists);
-        if (cursorId == null) {
+        if (cursorProduct == null) {
             return;
         }
-        validateCursorProduct(mainCategory, cursorId);
-    }
-
-    /**
-     * 현재 정렬 기준에서 필요한 cursor 값이 요청에 포함되어 있는지 확인한다.
-     */
-    private boolean hasSortCursorValue(
-            BigDecimal cursorAverageRating,
-            Integer cursorRatingNumber,
-            boolean sortByAverageRating
-    ) {
-        return sortByAverageRating
-                ? cursorAverageRating != null
-                : cursorRatingNumber != null;
-    }
-
-    /**
-     * cursorId와 정렬 cursor 값이 함께 있거나 함께 없는지 검증한다.
-     */
-    private void validateCursorPair(Long cursorId, boolean sortCursorValueExists) {
-        if (cursorId == null && sortCursorValueExists) {
-            throw new MissingCategoryCursorIdException();
+        if ("ratingNumber".equals(sort) && cursorProduct.getRatingNumber() == null) {
+            throw new MissingCategorySortCursorException();
         }
-        if (cursorId != null && !sortCursorValueExists) {
+        if ("price".equals(sort) && cursorProduct.getPrice() == null) {
+            throw new MissingCategorySortCursorException();
+        }
+        if ("averageRating".equals(sort) && cursorProduct.getAverageRating() == null) {
             throw new MissingCategorySortCursorException();
         }
     }
 
     /**
-     * cursorId가 실제 상품이고 요청 category에 속한 상품인지 검증한다.
+     * cursor 상품을 조회하고 category 일치 여부를 검증한다.
      */
-    private void validateCursorProduct(String mainCategory, Long cursorId) {
-        if (!productRepository.existsById(cursorId)) {
-            throw new ProductCategoryCursorNotFoundException();
+    private ProductDetailProjection findCursorProduct(String mainCategory, Long cursorId) {
+        if (cursorId == null) {
+            return null;
         }
-        if (!productRepository.existsByIdAndMainCategory(cursorId, mainCategory)) {
+        ProductDetailProjection cursorProduct = productRepository.findDetailById(cursorId)
+                .orElseThrow(ProductCategoryCursorNotFoundException::new);
+        if (!mainCategory.equals(cursorProduct.getMainCategory())) {
             throw new ProductCategoryCursorMismatchException();
         }
+        return cursorProduct;
+    }
+
+    /**
+     * 우선순위 규칙에 맞게 실제 정렬 기준을 확정한다.
+     */
+    private String selectSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "averageRating";
+        }
+        if (sort.contains("ratingNumber")) {
+            return "ratingNumber";
+        }
+        if (sort.contains("averageRating")) {
+            return "averageRating";
+        }
+        if (sort.contains("price")) {
+            return "price";
+        }
+        return "averageRating";
+    }
+
+    /**
+     * order가 desc가 아니면 asc를 기본값으로 사용한다.
+     */
+    private String selectOrder(String order) {
+        if ("desc".equalsIgnoreCase(order)) {
+            return "desc";
+        }
+        return "asc";
     }
 }

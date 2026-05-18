@@ -43,19 +43,15 @@ public class ProductController {
             @RequestParam String mainCategory,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(required = false) BigDecimal cursorAverageRating,
-            @RequestParam(required = false) Integer cursorRatingNumber,
-            @RequestParam(defaultValue = "false") boolean averageRating,
-            @RequestParam(defaultValue = "false") boolean ratingNumber
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String order
     ) {
         return productReadService.getProductsByCategory(
                 mainCategory,
                 size,
                 cursorId,
-                cursorAverageRating,
-                cursorRatingNumber,
-                averageRating,
-                ratingNumber
+                sort,
+                order
         );
     }
 
