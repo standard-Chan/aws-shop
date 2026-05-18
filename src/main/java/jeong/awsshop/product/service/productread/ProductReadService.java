@@ -54,11 +54,11 @@ public class ProductReadService {
             int size,
             Long cursorId,
             String sort,
-            String order
+            String direction
     ) {
         String normalizedCategory = normalizeCategory(mainCategory);
-        String selectedSort = selectSort(sort);
-        String selectedOrder = selectOrder(order);
+        CategoryProductSort selectedSort = CategoryProductSort.from(sort);
+        CategoryProductDirection selectedDirection = CategoryProductDirection.from(direction);
         ProductDetailProjection cursorProduct = findCursorProduct(normalizedCategory, cursorId);
 
         validateCursor(
@@ -71,11 +71,11 @@ public class ProductReadService {
                 cursorId,
                 cursorProduct,
                 selectedSort,
-                selectedOrder,
+                selectedDirection,
                 queryLimitForHasNext(size)
         );
 
-        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedOrder);
+        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedDirection);
     }
 
     /**
@@ -99,17 +99,17 @@ public class ProductReadService {
     }
 
     /**
-     * sort / order 조합에 따라 필요한 category 조회 쿼리를 호출한다.
+     * sort / direction 조합에 따라 필요한 category 조회 쿼리를 호출한다.
      */
     private List<ProductSummaryNativeProjection> findCategoryProductSummaries(
             String mainCategory,
             Long cursorId,
             ProductDetailProjection cursorProduct,
-            String sort,
-            String order,
+            CategoryProductSort sort,
+            CategoryProductDirection direction,
             int limit
     ) {
-        if ("ratingNumber".equals(sort)) {
+        if (sort == CategoryProductSort.RATING_NUMBER) {
             return productRepository.findCategoryProductSummariesOrderByRatingNumber(
                     mainCategory,
                     cursorId,
@@ -117,8 +117,8 @@ public class ProductReadService {
                     limit
             );
         }
-        if ("price".equals(sort)) {
-            if ("asc".equals(order)) {
+        if (sort == CategoryProductSort.PRICE) {
+            if (direction == CategoryProductDirection.ASC) {
                 return productRepository.findCategoryProductSummariesOrderByPriceAsc(
                         mainCategory,
                         cursorId,
@@ -160,18 +160,18 @@ public class ProductReadService {
      */
     private void validateCursor(
             ProductDetailProjection cursorProduct,
-            String sort
+            CategoryProductSort sort
     ) {
         if (cursorProduct == null) {
             return;
         }
-        if ("ratingNumber".equals(sort) && cursorProduct.getRatingNumber() == null) {
+        if (sort == CategoryProductSort.RATING_NUMBER && cursorProduct.getRatingNumber() == null) {
             throw new MissingCategorySortCursorException();
         }
-        if ("price".equals(sort) && cursorProduct.getPrice() == null) {
+        if (sort == CategoryProductSort.PRICE && cursorProduct.getPrice() == null) {
             throw new MissingCategorySortCursorException();
         }
-        if ("averageRating".equals(sort) && cursorProduct.getAverageRating() == null) {
+        if (sort == CategoryProductSort.AVERAGE_RATING && cursorProduct.getAverageRating() == null) {
             throw new MissingCategorySortCursorException();
         }
     }
@@ -191,32 +191,4 @@ public class ProductReadService {
         return cursorProduct;
     }
 
-    /**
-     * 우선순위 규칙에 맞게 실제 정렬 기준을 확정한다.
-     */
-    private String selectSort(String sort) {
-        if (sort == null || sort.isBlank()) {
-            return "averageRating";
-        }
-        if (sort.contains("ratingNumber")) {
-            return "ratingNumber";
-        }
-        if (sort.contains("averageRating")) {
-            return "averageRating";
-        }
-        if (sort.contains("price")) {
-            return "price";
-        }
-        return "averageRating";
-    }
-
-    /**
-     * order가 desc가 아니면 asc를 기본값으로 사용한다.
-     */
-    private String selectOrder(String order) {
-        if ("desc".equalsIgnoreCase(order)) {
-            return "desc";
-        }
-        return "asc";
-    }
 }

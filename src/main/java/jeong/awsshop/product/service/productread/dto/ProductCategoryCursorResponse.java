@@ -1,6 +1,8 @@
 package jeong.awsshop.product.service.productread.dto;
 
 import java.util.List;
+import jeong.awsshop.product.service.productread.CategoryProductSort;
+import jeong.awsshop.product.service.productread.CategoryProductDirection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 
 public record ProductCategoryCursorResponse(
@@ -15,8 +17,8 @@ public record ProductCategoryCursorResponse(
     public static ProductCategoryCursorResponse from(
             List<ProductSummaryNativeProjection> rows,
             int size,
-            String sort,
-            String direction
+            CategoryProductSort sort,
+            CategoryProductDirection direction
     ) {
         boolean hasNext = rows.size() > size;
         List<ProductSummaryResponse> products = rows.stream()
@@ -34,11 +36,11 @@ public record ProductCategoryCursorResponse(
     /**
      * price 정렬이 아니면 기존 정렬 기준 이름으로 cursor 응답을 선택한다.
      */
-    private static CategoryCursor cursorFrom(ProductSummaryResponse product, String sort) {
-        if ("price".equalsIgnoreCase(sort)) {
+    private static CategoryCursor cursorFrom(ProductSummaryResponse product, CategoryProductSort sort) {
+        if (sort == CategoryProductSort.PRICE) {
             return CategoryCursor.priceCursor(product);
         }
-        if ("ratingNumber".equalsIgnoreCase(sort)) {
+        if (sort == CategoryProductSort.RATING_NUMBER) {
             return CategoryCursor.ratingNumberCursor(product);
         }
         return CategoryCursor.averageRatingCursor(product);
