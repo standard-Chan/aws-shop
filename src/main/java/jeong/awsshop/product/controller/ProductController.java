@@ -44,14 +44,14 @@ public class ProductController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String order
+            @RequestParam(required = false) String direction
     ) {
         return productReadService.getProductsByCategory(
                 mainCategory,
                 size,
                 cursorId,
                 sort,
-                order
+                direction
         );
     }
 

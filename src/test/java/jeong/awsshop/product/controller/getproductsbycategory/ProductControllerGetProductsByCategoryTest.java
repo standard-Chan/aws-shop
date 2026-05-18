@@ -77,7 +77,7 @@ class ProductControllerGetProductsByCategoryTest {
                         .param("size", "10")
                         .param("cursorId", String.valueOf(cursorId))
                         .param("sort", "averageRating")
-                        .param("order", "desc"))
+                        .param("direction", "desc"))
                 .andExpect(status().isOk());
 
         // Then: controller는 받은 값을 그대로 ProductReadService에 전달해야 한다
@@ -91,8 +91,8 @@ class ProductControllerGetProductsByCategoryTest {
     }
 
     @Test
-    @DisplayName("category price ASC 조회 요청이면 sort, order, cursorId를 service에 전달해야 한다")
-    void should_call_service_with_price_sort_and_asc_order_when_category_request_is_valid() throws Exception {
+    @DisplayName("category price ASC 조회 요청이면 sort, direction, cursorId를 service에 전달해야 한다")
+    void should_call_service_with_price_sort_and_asc_direction_when_category_request_is_valid() throws Exception {
         // Given: price ASC cursor 요청과 service 응답을 준비한다
         Long cursorId = 9_000_000_000_000L;
         ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
@@ -114,7 +114,7 @@ class ProductControllerGetProductsByCategoryTest {
                         .param("size", "10")
                         .param("cursorId", String.valueOf(cursorId))
                         .param("sort", "price")
-                        .param("order", "asc"))
+                        .param("direction", "asc"))
                 .andExpect(status().isOk());
 
         // Then: controller는 받은 sort 계약을 ProductReadService에 전달해야 한다
