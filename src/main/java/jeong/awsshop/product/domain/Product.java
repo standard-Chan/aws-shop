@@ -32,13 +32,14 @@ public class Product implements Persistable<Long> {
     private String mainCategory;
 
     @Column(name = "average_rating")
-    private BigDecimal averageRating;
+    private BigDecimal averageRating; // 평균 별점
 
     @Column(name = "rating_number")
-    private Integer ratingNumber;
+    private Integer ratingNumber; // 리뷰 수
 
     private BigDecimal price;
 
+    @Column(name = "store", length = 1000)
     private String store;
 
     /**
