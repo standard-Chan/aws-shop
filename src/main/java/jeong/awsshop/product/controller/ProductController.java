@@ -3,7 +3,6 @@ package jeong.awsshop.product.controller;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
-import java.math.BigDecimal;
 import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductCategoryCursorResponse;
 import jeong.awsshop.product.service.productread.dto.ProductCursorResponse;
@@ -57,6 +56,7 @@ public class ProductController {
 
     /**
      * keyword로 Product 목록을 cursor 방식으로 조회한다.
+     * 외부 계약은 `order` parameter를 유지하지만 내부 표현은 `direction`으로 통일한다.
      */
     @GetMapping("/keyword")
     public ProductCategoryCursorResponse getProductsByKeyword(

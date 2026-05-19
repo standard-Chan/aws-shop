@@ -3,6 +3,7 @@ package jeong.awsshop.product.service.productread;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
@@ -58,25 +59,27 @@ public class ProductReadService {
             String direction
     ) {
         String normalizedCategory = normalizeCategory(mainCategory);
-        CategoryProductSort selectedSort = CategoryProductSort.from(sort);
-        CategoryProductDirection selectedDirection = CategoryProductDirection.from(direction);
-        ProductDetailProjection cursorProduct = findCursorProduct(normalizedCategory, cursorId);
-
-        validateCursor(
-                cursorProduct,
+        CategoryProductSort selectedSort = resolveProductSort(sort);
+        CategoryProductDirection selectedDirection = resolveProductDirection(direction);
+        ProductDetailProjection cursorProduct = prepareCategoryCursorProduct(
+                normalizedCategory,
+                cursorId,
                 selectedSort
         );
 
-        List<ProductSummaryNativeProjection> rows = findCategoryProductSummaries(
-                normalizedCategory,
-                cursorId,
-                cursorProduct,
+        return ProductCategoryCursorResponse.from(
+                readCategoryProductSummaries(
+                        normalizedCategory,
+                        size,
+                        cursorId,
+                        cursorProduct,
+                        selectedSort,
+                        selectedDirection
+                ),
+                size,
                 selectedSort,
-                selectedDirection,
-                queryLimitForHasNext(size)
+                selectedDirection
         );
-
-        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedDirection);
     }
 
     /**
@@ -153,7 +156,7 @@ public class ProductReadService {
             return productRepository.findCategoryProductSummariesOrderByRatingNumber(
                     mainCategory,
                     cursorId,
-                    cursorProduct == null ? null : cursorProduct.getRatingNumber(),
+                    ratingNumberOf(cursorProduct),
                     limit
             );
         }
@@ -162,21 +165,21 @@ public class ProductReadService {
                 return productRepository.findCategoryProductSummariesOrderByPriceAsc(
                         mainCategory,
                         cursorId,
-                        cursorProduct == null ? null : cursorProduct.getPrice(),
+                        priceOf(cursorProduct),
                         limit
                 );
             }
             return productRepository.findCategoryProductSummariesOrderByPriceDesc(
                     mainCategory,
                     cursorId,
-                    cursorProduct == null ? null : cursorProduct.getPrice(),
+                    priceOf(cursorProduct),
                     limit
             );
         }
         return productRepository.findCategoryProductSummariesOrderByAverageRating(
                 mainCategory,
                 cursorId,
-                cursorProduct == null ? null : cursorProduct.getAverageRating(),
+                averageRatingOf(cursorProduct),
                 limit
         );
     }
@@ -196,7 +199,7 @@ public class ProductReadService {
             return productRepository.findKeywordProductSummariesOrderByRatingNumber(
                     keyword,
                     cursorId,
-                    cursorProduct == null ? null : cursorProduct.getRatingNumber(),
+                    ratingNumberOf(cursorProduct),
                     limit
             );
         }
@@ -205,21 +208,21 @@ public class ProductReadService {
                 return productRepository.findKeywordProductSummariesOrderByPriceAsc(
                         keyword,
                         cursorId,
-                        cursorProduct == null ? null : cursorProduct.getPrice(),
+                        priceOf(cursorProduct),
                         limit
                 );
             }
             return productRepository.findKeywordProductSummariesOrderByPriceDesc(
                     keyword,
                     cursorId,
-                    cursorProduct == null ? null : cursorProduct.getPrice(),
+                    priceOf(cursorProduct),
                     limit
             );
         }
         return productRepository.findKeywordProductSummariesOrderByAverageRating(
                 keyword,
                 cursorId,
-                cursorProduct == null ? null : cursorProduct.getAverageRating(),
+                averageRatingOf(cursorProduct),
                 limit
         );
     }
@@ -245,8 +248,42 @@ public class ProductReadService {
             Long cursorId,
             CategoryProductSort selectedSort
     ) {
-        ProductDetailProjection cursorProduct = findKeywordCursorProduct(normalizedKeyword, cursorId);
-        validateCursor(cursorProduct, selectedSort);
+        return prepareCursorProduct(
+                cursorId,
+                cursorProduct -> containsKeyword(cursorProduct.getTitle(), normalizedKeyword),
+                selectedSort
+        );
+    }
+
+    private ProductDetailProjection prepareCategoryCursorProduct(
+            String normalizedCategory,
+            Long cursorId,
+            CategoryProductSort selectedSort
+    ) {
+        return prepareCursorProduct(
+                cursorId,
+                cursorProduct -> normalizedCategory.equals(cursorProduct.getMainCategory()),
+                selectedSort
+        );
+    }
+
+    /**
+     * cursor 상품 조회, 요청 집합 일치 검증, 정렬값 검증을 한 흐름으로 묶는다.
+     */
+    private ProductDetailProjection prepareCursorProduct(
+            Long cursorId,
+            Predicate<ProductDetailProjection> matchesRequestedSet,
+            CategoryProductSort selectedSort
+    ) {
+        if (cursorId == null) {
+            return null;
+        }
+
+        ProductDetailProjection cursorProduct = productRepository.findDetailById(cursorId)
+                .orElseThrow(ProductCategoryCursorNotFoundException::new);
+
+        validateCursorBelongsToRequestedSet(cursorProduct, matchesRequestedSet);
+        validateCursorSortValue(cursorProduct, selectedSort);
         return cursorProduct;
     }
 
@@ -261,6 +298,24 @@ public class ProductReadService {
         // LIKE 검색에 필요한 escape 패턴과 기존 cursor 규칙을 함께 사용한다.
         return findKeywordProductSummaries(
                 normalizedKeyword,
+                cursorId,
+                cursorProduct,
+                selectedSort,
+                selectedDirection,
+                queryLimitForHasNext(size)
+        );
+    }
+
+    private List<ProductSummaryNativeProjection> readCategoryProductSummaries(
+            String normalizedCategory,
+            int size,
+            Long cursorId,
+            ProductDetailProjection cursorProduct,
+            CategoryProductSort selectedSort,
+            CategoryProductDirection selectedDirection
+    ) {
+        return findCategoryProductSummaries(
+                normalizedCategory,
                 cursorId,
                 cursorProduct,
                 selectedSort,
@@ -286,7 +341,7 @@ public class ProductReadService {
     /**
      * sort 문자열 기준으로 필요한 cursor 조합과 cursor 상품 일치 여부를 검증한다.
      */
-    private void validateCursor(
+    private void validateCursorSortValue(
             ProductDetailProjection cursorProduct,
             CategoryProductSort sort
     ) {
@@ -305,33 +360,15 @@ public class ProductReadService {
     }
 
     /**
-     * cursor 상품을 조회하고 category 일치 여부를 검증한다.
+     * category / keyword 요청 집합에 cursor 상품이 속하는지 검증한다.
      */
-    private ProductDetailProjection findCursorProduct(String mainCategory, Long cursorId) {
-        if (cursorId == null) {
-            return null;
-        }
-        ProductDetailProjection cursorProduct = productRepository.findDetailById(cursorId)
-                .orElseThrow(ProductCategoryCursorNotFoundException::new);
-        if (!mainCategory.equals(cursorProduct.getMainCategory())) {
+    private void validateCursorBelongsToRequestedSet(
+            ProductDetailProjection cursorProduct,
+            Predicate<ProductDetailProjection> matchesRequestedSet
+    ) {
+        if (!matchesRequestedSet.test(cursorProduct)) {
             throw new ProductCategoryCursorMismatchException();
         }
-        return cursorProduct;
-    }
-
-    /**
-     * cursor 상품을 조회하고 keyword 검색 결과 집합에 포함되는지 검증한다.
-     */
-    private ProductDetailProjection findKeywordCursorProduct(String keyword, Long cursorId) {
-        if (cursorId == null) {
-            return null;
-        }
-        ProductDetailProjection cursorProduct = productRepository.findDetailById(cursorId)
-                .orElseThrow(ProductCategoryCursorNotFoundException::new);
-        if (!containsKeyword(cursorProduct.getTitle(), keyword)) {
-            throw new ProductCategoryCursorMismatchException();
-        }
-        return cursorProduct;
     }
 
     /**
@@ -349,6 +386,18 @@ public class ProductReadService {
      */
     private boolean containsKeyword(String title, String keyword) {
         return title != null && title.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
+    }
+
+    private Integer ratingNumberOf(ProductDetailProjection cursorProduct) {
+        return cursorProduct == null ? null : cursorProduct.getRatingNumber();
+    }
+
+    private BigDecimal priceOf(ProductDetailProjection cursorProduct) {
+        return cursorProduct == null ? null : cursorProduct.getPrice();
+    }
+
+    private BigDecimal averageRatingOf(ProductDetailProjection cursorProduct) {
+        return cursorProduct == null ? null : cursorProduct.getAverageRating();
     }
 
 }
