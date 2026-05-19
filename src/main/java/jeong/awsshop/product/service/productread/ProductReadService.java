@@ -2,6 +2,7 @@ package jeong.awsshop.product.service.productread;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
@@ -79,6 +80,41 @@ public class ProductReadService {
     }
 
     /**
+     * keyword별 Product cursor 목록 조회 결과를 응답 DTO로 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public ProductCategoryCursorResponse getProductsByKeyword(
+            String keyword,
+            int size,
+            Long cursorId,
+            String sort,
+            String order
+    ) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword.isBlank()) {
+            return new ProductCategoryCursorResponse(List.of(), null, false);
+        }
+
+        CategoryProductSort selectedSort = CategoryProductSort.from(sort);
+        CategoryProductDirection selectedDirection = CategoryProductDirection.from(order);
+        ProductDetailProjection cursorProduct = findKeywordCursorProduct(normalizedKeyword, cursorId);
+
+        validateCursor(cursorProduct, selectedSort);
+
+        // LIKE 검색에 필요한 escape 패턴과 기존 cursor 규칙을 함께 사용한다.
+        List<ProductSummaryNativeProjection> rows = findKeywordProductSummaries(
+                normalizedKeyword,
+                cursorId,
+                cursorProduct,
+                selectedSort,
+                selectedDirection,
+                queryLimitForHasNext(size)
+        );
+
+        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedDirection);
+    }
+
+    /**
      * Product id로 상세 조회 결과를 반환한다.
      */
     @Transactional(readOnly = true)
@@ -142,6 +178,49 @@ public class ProductReadService {
     }
 
     /**
+     * sort / direction 조합에 따라 필요한 keyword 조회 쿼리를 호출한다.
+     */
+    private List<ProductSummaryNativeProjection> findKeywordProductSummaries(
+            String keyword,
+            Long cursorId,
+            ProductDetailProjection cursorProduct,
+            CategoryProductSort sort,
+            CategoryProductDirection direction,
+            int limit
+    ) {
+        if (sort == CategoryProductSort.RATING_NUMBER) {
+            return productRepository.findKeywordProductSummariesOrderByRatingNumber(
+                    keyword,
+                    cursorId,
+                    cursorProduct == null ? null : cursorProduct.getRatingNumber(),
+                    limit
+            );
+        }
+        if (sort == CategoryProductSort.PRICE) {
+            if (direction == CategoryProductDirection.ASC) {
+                return productRepository.findKeywordProductSummariesOrderByPriceAsc(
+                        keyword,
+                        cursorId,
+                        cursorProduct == null ? null : cursorProduct.getPrice(),
+                        limit
+                );
+            }
+            return productRepository.findKeywordProductSummariesOrderByPriceDesc(
+                    keyword,
+                    cursorId,
+                    cursorProduct == null ? null : cursorProduct.getPrice(),
+                    limit
+            );
+        }
+        return productRepository.findKeywordProductSummariesOrderByAverageRating(
+                keyword,
+                cursorId,
+                cursorProduct == null ? null : cursorProduct.getAverageRating(),
+                limit
+        );
+    }
+
+    /**
      * 다음 페이지 존재 여부를 확인하기 위해 요청 size보다 1개 더 조회한다.
      */
     private int queryLimitForHasNext(int size) {
@@ -189,6 +268,38 @@ public class ProductReadService {
             throw new ProductCategoryCursorMismatchException();
         }
         return cursorProduct;
+    }
+
+    /**
+     * cursor 상품을 조회하고 keyword 검색 결과 집합에 포함되는지 검증한다.
+     */
+    private ProductDetailProjection findKeywordCursorProduct(String keyword, Long cursorId) {
+        if (cursorId == null) {
+            return null;
+        }
+        ProductDetailProjection cursorProduct = productRepository.findDetailById(cursorId)
+                .orElseThrow(ProductCategoryCursorNotFoundException::new);
+        if (!containsKeyword(cursorProduct.getTitle(), keyword)) {
+            throw new ProductCategoryCursorMismatchException();
+        }
+        return cursorProduct;
+    }
+
+    /**
+     * keyword 검색 전 입력 문자열의 앞뒤 공백만 제거한다.
+     */
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return "";
+        }
+        return keyword.trim();
+    }
+
+    /**
+     * 대소문자 무시 contains 규칙으로 cursor 상품의 검색 집합 포함 여부를 판단한다.
+     */
+    private boolean containsKeyword(String title, String keyword) {
+        return title != null && title.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
     }
 
 }

@@ -56,6 +56,26 @@ public class ProductController {
     }
 
     /**
+     * keyword로 Product 목록을 cursor 방식으로 조회한다.
+     */
+    @GetMapping("/keyword")
+    public ProductCategoryCursorResponse getProductsByKeyword(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String order
+    ) {
+        return productReadService.getProductsByKeyword(
+                keyword,
+                size,
+                cursorId,
+                sort,
+                order
+        );
+    }
+
+    /**
      * Product id로 단일 상품 상세 정보를 조회한다.
      */
     @GetMapping("/{id}")
