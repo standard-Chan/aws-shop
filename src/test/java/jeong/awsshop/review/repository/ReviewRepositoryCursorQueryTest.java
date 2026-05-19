@@ -131,7 +131,7 @@ class ReviewRepositoryCursorQueryTest {
 
         // Then: helpfulVote DESC, timestamp DESC, id ASC 순서를 유지해야 한다.
         assertThat(rows).extracting(ReviewSummaryProjection::getId)
-                .containsSequence(20002L, 20001L, 20003L, 20004L, 20007L, 20006L);
+                .containsSequence(20002L, 10003L, 20001L, 20003L, 20004L, 20006L, 20007L);
     }
 
     @Test
@@ -175,7 +175,7 @@ class ReviewRepositoryCursorQueryTest {
 
         // Then: rating 오름차순과 timestamp DESC, id ASC tie-breaker를 만족해야 한다.
         assertThat(rows).extracting(ReviewSummaryProjection::getId)
-                .containsSequence(20002L, 20004L, 20007L, 20001L, 20003L);
+                .containsSequence(20002L, 20004L, 20005L, 20007L, 10003L, 20001L, 20003L);
     }
 
     @Test

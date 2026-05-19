@@ -70,9 +70,9 @@ class ReviewReadServiceTest {
         assertThat(response.reviews()).extracting(ReviewResponse::id)
                 .containsExactly(20002L, 20001L);
         verify(reviewRepository).findReviewSummaries(
-                "B096MTTDJL",
-                "helpfulVote",
-                "desc",
+                eq("B096MTTDJL"),
+                eq("helpfulVote"),
+                eq("desc"),
                 isNull(),
                 isNull(),
                 isNull(),
