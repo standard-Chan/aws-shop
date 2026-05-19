@@ -88,30 +88,34 @@ public class ProductReadService {
             int size,
             Long cursorId,
             String sort,
-            String order
+            String direction
     ) {
         String normalizedKeyword = normalizeKeyword(keyword);
-        if (normalizedKeyword.isBlank()) {
-            return new ProductCategoryCursorResponse(List.of(), null, false);
+        if (isBlankKeyword(normalizedKeyword)) {
+            return emptyCategoryCursorResponse();
         }
 
-        CategoryProductSort selectedSort = CategoryProductSort.from(sort);
-        CategoryProductDirection selectedDirection = CategoryProductDirection.from(order);
-        ProductDetailProjection cursorProduct = findKeywordCursorProduct(normalizedKeyword, cursorId);
-
-        validateCursor(cursorProduct, selectedSort);
-
-        // LIKE 검색에 필요한 escape 패턴과 기존 cursor 규칙을 함께 사용한다.
-        List<ProductSummaryNativeProjection> rows = findKeywordProductSummaries(
+        CategoryProductSort selectedSort = resolveProductSort(sort);
+        CategoryProductDirection selectedDirection = resolveProductDirection(direction);
+        ProductDetailProjection cursorProduct = prepareKeywordCursorProduct(
                 normalizedKeyword,
                 cursorId,
-                cursorProduct,
-                selectedSort,
-                selectedDirection,
-                queryLimitForHasNext(size)
+                selectedSort
         );
 
-        return ProductCategoryCursorResponse.from(rows, size, selectedSort, selectedDirection);
+        return ProductCategoryCursorResponse.from(
+                readKeywordProductSummaries(
+                        normalizedKeyword,
+                        size,
+                        cursorId,
+                        cursorProduct,
+                        selectedSort,
+                        selectedDirection
+                ),
+                size,
+                selectedSort,
+                selectedDirection
+        );
     }
 
     /**
@@ -217,6 +221,51 @@ public class ProductReadService {
                 cursorId,
                 cursorProduct == null ? null : cursorProduct.getAverageRating(),
                 limit
+        );
+    }
+
+    private boolean isBlankKeyword(String keyword) {
+        return keyword.isBlank();
+    }
+
+    private ProductCategoryCursorResponse emptyCategoryCursorResponse() {
+        return new ProductCategoryCursorResponse(List.of(), null, false);
+    }
+
+    private CategoryProductSort resolveProductSort(String sort) {
+        return CategoryProductSort.from(sort);
+    }
+
+    private CategoryProductDirection resolveProductDirection(String direction) {
+        return CategoryProductDirection.from(direction);
+    }
+
+    private ProductDetailProjection prepareKeywordCursorProduct(
+            String normalizedKeyword,
+            Long cursorId,
+            CategoryProductSort selectedSort
+    ) {
+        ProductDetailProjection cursorProduct = findKeywordCursorProduct(normalizedKeyword, cursorId);
+        validateCursor(cursorProduct, selectedSort);
+        return cursorProduct;
+    }
+
+    private List<ProductSummaryNativeProjection> readKeywordProductSummaries(
+            String normalizedKeyword,
+            int size,
+            Long cursorId,
+            ProductDetailProjection cursorProduct,
+            CategoryProductSort selectedSort,
+            CategoryProductDirection selectedDirection
+    ) {
+        // LIKE 검색에 필요한 escape 패턴과 기존 cursor 규칙을 함께 사용한다.
+        return findKeywordProductSummaries(
+                normalizedKeyword,
+                cursorId,
+                cursorProduct,
+                selectedSort,
+                selectedDirection,
+                queryLimitForHasNext(size)
         );
     }
 
