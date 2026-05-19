@@ -1,4 +1,4 @@
-package jeong.awsshop.product.controller.getproducts;
+package jeong.awsshop.product.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,7 +21,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ProductController.class)
-class ProductControllerGetProductsTest {
+class GetProductsControllerTest {
 
     @Autowired
     private MockMvc mockMvc;

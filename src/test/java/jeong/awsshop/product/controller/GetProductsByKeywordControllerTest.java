@@ -1,4 +1,4 @@
-package jeong.awsshop.product.controller.getproductsbykeyword;
+package jeong.awsshop.product.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,7 +18,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(ProductController.class)
-class ProductControllerGetProductsByKeywordTest {
+class GetProductsByKeywordControllerTest {
 
     @Autowired
     private MockMvc mockMvc;

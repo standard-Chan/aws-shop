@@ -1,4 +1,4 @@
-package jeong.awsshop.product.service.productread.getproductsbykeyword;
+package jeong.awsshop.product.service.productread;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,7 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
-class ProductReadServiceGetProductsByKeywordTest {
+class GetProductsByKeywordTest {
 
     @Mock
     private ProductRepository productRepository;

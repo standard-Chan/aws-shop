@@ -1,4 +1,4 @@
-package jeong.awsshop.product.service.productread.getproducts;
+package jeong.awsshop.product.service.productread;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,7 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class ProductReadServiceGetProductsTest {
+class GetProductsTest {
 
     @Mock
     private ProductRepository productRepository;

@@ -1,4 +1,4 @@
-package jeong.awsshop.product.repository.findproductdetail;
+package jeong.awsshop.product.repository;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +31,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ProductRepositoryFindProductDetailTest {
+class FindProductDetailRepositoryTest {
 
     @Autowired
     private BulkInsertService bulkInsertService;
