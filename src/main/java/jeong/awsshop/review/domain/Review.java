@@ -34,10 +34,10 @@ public class Review {
     private String user;
 
     @Column(name = "product_id", nullable = false)
-    private String parentAsin;
+    private String parentAsin; // 상품 고유 ID
 
     @Column(name = "asin")
-    private String asin;
+    private String asin; // 상품 ID (size, color 등에 따라 상이할 수 있다)
 
     @Column(name = "rating", nullable = false)
     private Float rating;
@@ -52,10 +52,10 @@ public class Review {
     private Long timestamp;
 
     @Column(name = "verified_purchase", nullable = false)
-    private Boolean verifiedPurchase;
+    private Boolean verifiedPurchase; // (구매 여부)
 
     @Column(name = "helpful_vote", nullable = false)
-    private Integer helpfulVote;
+    private Integer helpfulVote; // 추천 수
 
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReviewImage> images = new ArrayList<>();
