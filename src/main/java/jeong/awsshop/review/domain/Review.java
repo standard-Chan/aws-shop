@@ -39,7 +39,7 @@ public class Review {
     @Column(name = "asin")
     private String asin; // 상품 ID (size, color 등에 따라 상이할 수 있다)
 
-    @Column(name = "rating", nullable = false)
+    @Column(name = "rating")
     private Float rating;
 
     @Column(length = 511)
@@ -54,7 +54,7 @@ public class Review {
     @Column(name = "verified_purchase", nullable = false)
     private Boolean verifiedPurchase; // (구매 여부)
 
-    @Column(name = "helpful_vote", nullable = false)
+    @Column(name = "helpful_vote")
     private Integer helpfulVote; // 추천 수
 
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
