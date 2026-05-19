@@ -2,7 +2,6 @@ package jeong.awsshop.review.controller;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jeong.awsshop.review.exception.reviewread.InvalidReviewCursorException;
 import jeong.awsshop.review.service.reviewread.ReviewReadService;
 import jeong.awsshop.review.service.reviewread.dto.ReviewCursorResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,6 @@ public class ReviewController {
             @RequestParam(required = false) Integer cursorHelpfulVote,
             @RequestParam(required = false) Float cursorRating
     ) {
-        validateCursorCombination(sort, cursorId, cursorTimestamp, cursorHelpfulVote, cursorRating);
         return reviewReadService.getReviewsByProductId(
                 parentAsin,
                 size,
@@ -46,40 +44,5 @@ public class ReviewController {
                 cursorHelpfulVote,
                 cursorRating
         );
-    }
-
-    /**
-     * controller 단계에서 불완전한 cursor 조합을 차단한다.
-     */
-    private void validateCursorCombination(
-            String sort,
-            Long cursorId,
-            Long cursorTimestamp,
-            Integer cursorHelpfulVote,
-            Float cursorRating
-    ) {
-        boolean hasAnyCursor = cursorId != null
-                || cursorTimestamp != null
-                || cursorHelpfulVote != null
-                || cursorRating != null;
-
-        if (!hasAnyCursor) {
-            return;
-        }
-
-        if (cursorId == null || cursorTimestamp == null) {
-            throw new InvalidReviewCursorException();
-        }
-
-        if ("rating".equalsIgnoreCase(sort)) {
-            if (cursorRating == null) {
-                throw new InvalidReviewCursorException();
-            }
-            return;
-        }
-
-        if (cursorHelpfulVote == null) {
-            throw new InvalidReviewCursorException();
-        }
     }
 }

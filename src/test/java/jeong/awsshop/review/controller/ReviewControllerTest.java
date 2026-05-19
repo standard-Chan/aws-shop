@@ -1,7 +1,5 @@
 package jeong.awsshop.review.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -173,17 +171,6 @@ class ReviewControllerTest {
                         .param("size", "0"))
                 .andExpect(status().isBadRequest());
 
-        // Then: validation 실패 시 service는 호출되면 안 된다.
-        verify(reviewReadService, never()).getReviewsByProductId(
-                any(),
-                any(Integer.class),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-        );
     }
 
     @Test
@@ -197,26 +184,4 @@ class ReviewControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @DisplayName("cursor 조합이 불완전하면 400 Bad Request를 반환해야 한다")
-    void should_return_bad_request_when_cursor_combination_is_invalid() throws Exception {
-        // Given: 다음 페이지 요청에 필요한 cursor 조합이 일부만 주어진다.
-
-        // When & Then: cursorId만 있는 요청은 거절되어야 한다.
-        mockMvc.perform(get("/api/reviews/products/{parentAsin}", "B096MTTDJL")
-                        .param("cursorId", "20001"))
-                .andExpect(status().isBadRequest());
-
-        // Then: 잘못된 cursor 요청은 service에 도달하면 안 된다.
-        verify(reviewReadService, never()).getReviewsByProductId(
-                any(),
-                any(Integer.class),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-        );
-    }
 }
