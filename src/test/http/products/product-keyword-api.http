@@ -1,0 +1,69 @@
+### keyword 기본 조회 - averageRating 기본 정렬(desc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20
+Accept: application/json
+
+### keyword 조회 - averageRating 정렬(desc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=averageRating&order=desc
+Accept: application/json
+
+### keyword 조회 - averageRating cursor 기반 다음 페이지
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=averageRating&order=desc&cursorId=323413208910009350
+Accept: application/json
+
+### keyword 조회 - ratingNumber 정렬(desc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=ratingNumber&order=desc
+Accept: application/json
+
+### keyword 조회 - ratingNumber cursor 기반 다음 페이지
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=ratingNumber&order=desc&cursorId=323413198919176251
+Accept: application/json
+
+### keyword 조회 - price 정렬(asc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=price&order=asc
+Accept: application/json
+
+### keyword 조회 - price cursor 기반 다음 페이지(asc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=price&order=asc&cursorId=323413225263599667
+Accept: application/json
+
+### keyword 조회 - price 정렬(desc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=price&order=desc
+Accept: application/json
+
+### keyword 조회 - price cursor 기반 다음 페이지(desc)
+
+GET http://localhost:8080/api/products/keyword?keyword=wire&size=20&sort=price&order=desc&cursorId=323413366951383211
+Accept: application/json
+
+### keyword 조회 - 결과 없음
+
+GET http://localhost:8080/api/products/keyword?keyword=no-such-keyword&size=20
+Accept: application/json
+
+### keyword 조회 - blank keyword
+
+GET http://localhost:8080/api/products/keyword?keyword=%20%20%20&size=20
+Accept: application/json
+
+### keyword 조회 - percent 문자 포함
+
+GET http://localhost:8080/api/products/keyword?keyword=100%25&size=20
+Accept: application/json
+
+### keyword 조회 - underscore 문자 포함
+
+GET http://localhost:8080/api/products/keyword?keyword=A_B&size=20
+Accept: application/json
+
+### keyword 조회 - at 문자 포함
+
+GET http://localhost:8080/api/products/keyword?keyword=A@&size=20
+Accept: application/json
