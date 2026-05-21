@@ -153,6 +153,14 @@ public class ProductReadService {
             int limit
     ) {
         if (sort == CategoryProductSort.RATING_NUMBER) {
+            if (direction == CategoryProductDirection.ASC) {
+                return productRepository.findCategoryProductSummariesOrderByRatingNumberAsc(
+                        mainCategory,
+                        cursorId,
+                        ratingNumberOf(cursorProduct),
+                        limit
+                );
+            }
             return productRepository.findCategoryProductSummariesOrderByRatingNumber(
                     mainCategory,
                     cursorId,
@@ -204,6 +212,14 @@ public class ProductReadService {
             int limit
     ) {
         if (sort == CategoryProductSort.RATING_NUMBER) {
+            if (direction == CategoryProductDirection.ASC) {
+                return productRepository.findKeywordProductSummariesOrderByRatingNumberAsc(
+                        keyword,
+                        cursorId,
+                        ratingNumberOf(cursorProduct),
+                        limit
+                );
+            }
             return productRepository.findKeywordProductSummariesOrderByRatingNumber(
                     keyword,
                     cursorId,

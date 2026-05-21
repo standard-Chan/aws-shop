@@ -284,6 +284,60 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     p.store
                 FROM product p
                 WHERE p.main_category = :mainCategory
+                  AND p.rating_number IS NOT NULL
+                  AND (
+                      :cursorId IS NULL
+                      OR p.rating_number > :cursorRatingNumber
+                      OR (p.rating_number = :cursorRatingNumber AND p.id > :cursorId)
+                  )
+                ORDER BY p.rating_number ASC, p.id ASC
+                LIMIT :limit
+            ) p
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
+            ORDER BY p.rating_number ASC, p.id ASC
+            """, nativeQuery = true)
+    List<ProductSummaryNativeProjection> findCategoryProductSummariesOrderByRatingNumberAsc(
+            @Param("mainCategory") String mainCategory,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorRatingNumber") Integer cursorRatingNumber,
+            @Param("limit") int limit
+    );
+
+    @Query(value = """
+            SELECT
+                p.id AS id,
+                p.parent_asin AS parentAsin,
+                p.title AS title,
+                p.main_category AS mainCategory,
+                p.average_rating AS averageRating,
+                p.rating_number AS ratingNumber,
+                p.price AS price,
+                p.store AS store,
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
+            FROM (
+                SELECT
+                    p.id,
+                    p.parent_asin,
+                    p.title,
+                    p.main_category,
+                    p.average_rating,
+                    p.rating_number,
+                    p.price,
+                    p.store
+                FROM product p
+                WHERE p.main_category = :mainCategory
                   AND p.price IS NOT NULL
                   AND (
                       :cursorId IS NULL
@@ -522,6 +576,60 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             ORDER BY p.rating_number DESC, p.id ASC
             """, nativeQuery = true)
     List<ProductSummaryNativeProjection> findKeywordProductSummariesOrderByRatingNumber(
+            @Param("keyword") String keyword,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorRatingNumber") Integer cursorRatingNumber,
+            @Param("limit") int limit
+    );
+
+    @Query(value = """
+            SELECT
+                p.id AS id,
+                p.parent_asin AS parentAsin,
+                p.title AS title,
+                p.main_category AS mainCategory,
+                p.average_rating AS averageRating,
+                p.rating_number AS ratingNumber,
+                p.price AS price,
+                p.store AS store,
+                pi.variant AS imageVariant,
+                pi.thumb AS imageThumb,
+                pi.large AS imageLarge,
+                pi.hi_res AS imageHiRes
+            FROM (
+                SELECT
+                    p.id,
+                    p.parent_asin,
+                    p.title,
+                    p.main_category,
+                    p.average_rating,
+                    p.rating_number,
+                    p.price,
+                    p.store
+                FROM product p
+                WHERE """ + KEYWORD_CONTAINS_CLAUSE + """
+                  AND p.rating_number IS NOT NULL
+                  AND (
+                      :cursorId IS NULL
+                      OR p.rating_number > :cursorRatingNumber
+                      OR (p.rating_number = :cursorRatingNumber AND p.id > :cursorId)
+                  )
+                ORDER BY p.rating_number ASC, p.id ASC
+                LIMIT :limit
+            ) p
+            LEFT JOIN product_images pi
+              ON pi.id = (
+                  SELECT pi2.id
+                  FROM product_images pi2
+                  WHERE pi2.product_id = p.id
+                  ORDER BY
+                      CASE WHEN pi2.variant = 'MAIN' THEN 0 ELSE 1 END,
+                      pi2.id ASC
+                  LIMIT 1
+              )
+            ORDER BY p.rating_number ASC, p.id ASC
+            """, nativeQuery = true)
+    List<ProductSummaryNativeProjection> findKeywordProductSummariesOrderByRatingNumberAsc(
             @Param("keyword") String keyword,
             @Param("cursorId") Long cursorId,
             @Param("cursorRatingNumber") Integer cursorRatingNumber,
