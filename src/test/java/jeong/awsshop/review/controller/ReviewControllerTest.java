@@ -66,7 +66,7 @@ class ReviewControllerTest {
         // Given: rating ASC 기준 다음 페이지 조회 응답을 준비한다.
         ReviewCursorResponse response = new ReviewCursorResponse(
                 List.of(),
-                new ReviewCursor(20003L, 1653846936825L, null, 5.0F),
+                new ReviewCursor("20003", 1653846936825L, null, 5.0F),
                 true
         );
         when(reviewReadService.getReviewsByProductId(
@@ -120,7 +120,7 @@ class ReviewControllerTest {
                 "IMAGE"
         );
         ReviewResponse review = new ReviewResponse(
-                20001L,
+                "20001",
                 5.0F,
                 "I absolutely love the colors & product. However , the price is too high",
                 "I am always on the hunt for new lip gloss and lipstick . I decided to try this one on an Amazon daily deal.",
@@ -134,7 +134,7 @@ class ReviewControllerTest {
         );
         ReviewCursorResponse response = new ReviewCursorResponse(
                 List.of(review),
-                new ReviewCursor(20001L, 1653846936825L, 11, null),
+                new ReviewCursor("20001", 1653846936825L, 11, null),
                 true
         );
         when(reviewReadService.getReviewsByProductId(
@@ -152,11 +152,11 @@ class ReviewControllerTest {
         mockMvc.perform(get("/api/reviews/products/{parentAsin}", "B096MTTDJL")
                         .param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reviews[0].id").value(20001L))
+                .andExpect(jsonPath("$.reviews[0].id").value("20001"))
                 .andExpect(jsonPath("$.reviews[0].rating").value(5.0))
                 .andExpect(jsonPath("$.reviews[0].parentAsin").value("B096MTTDJL"))
                 .andExpect(jsonPath("$.reviews[0].images[0].attachmentType").value("IMAGE"))
-                .andExpect(jsonPath("$.nextCursor.id").value(20001L))
+                .andExpect(jsonPath("$.nextCursor.id").value("20001"))
                 .andExpect(jsonPath("$.nextCursor.helpfulVote").value(11))
                 .andExpect(jsonPath("$.hasNext").value(true));
     }
