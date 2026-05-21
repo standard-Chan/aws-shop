@@ -4,15 +4,15 @@ import java.math.BigDecimal;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 
 public record ProductSummaryResponse(
-        Long id,
-        String parentAsin,
-        String title,
-        String mainCategory,
-        BigDecimal averageRating,
-        Integer ratingNumber,
-        BigDecimal price,
-        String store,
-        ProductImageResponse image
+    String id,
+    String parentAsin,
+    String title,
+    String mainCategory,
+    BigDecimal averageRating,
+    Integer ratingNumber,
+    BigDecimal price,
+    String store,
+    ProductImageResponse image
 ) {
 
     /**
@@ -20,15 +20,15 @@ public record ProductSummaryResponse(
      */
     public static ProductSummaryResponse from(ProductSummaryNativeProjection row) {
         return new ProductSummaryResponse(
-                row.getId(),
-                row.getParentAsin(),
-                row.getTitle(),
-                row.getMainCategory(),
-                row.getAverageRating(),
-                row.getRatingNumber(),
-                row.getPrice(),
-                row.getStore(),
-                ProductImageResponse.from(row)
+            String.valueOf(row.getId()),
+            row.getParentAsin(),
+            row.getTitle(),
+            row.getMainCategory(),
+            row.getAverageRating(),
+            row.getRatingNumber(),
+            row.getPrice(),
+            row.getStore(),
+            ProductImageResponse.from(row)
         );
     }
 }

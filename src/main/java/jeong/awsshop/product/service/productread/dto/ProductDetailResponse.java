@@ -14,7 +14,7 @@ import jeong.awsshop.product.repository.projection.ProductImageDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductVideoDetailProjection;
 
 public record ProductDetailResponse(
-        Long id,
+        String id,
         String parentAsin,
         String title,
         String mainCategory,
@@ -46,7 +46,7 @@ public record ProductDetailResponse(
             List<ProductVideoDetailProjection> videos
     ) {
         return new ProductDetailResponse(
-                product.getId(),
+                String.valueOf(product.getId()),
                 product.getParentAsin(),
                 product.getTitle(),
                 product.getMainCategory(),

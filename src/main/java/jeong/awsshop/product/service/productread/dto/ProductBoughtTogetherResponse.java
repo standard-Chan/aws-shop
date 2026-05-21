@@ -3,7 +3,7 @@ package jeong.awsshop.product.service.productread.dto;
 import jeong.awsshop.product.repository.projection.ProductBoughtTogetherDetailProjection;
 
 public record ProductBoughtTogetherResponse(
-        Long relatedProductId,
+        String relatedProductId,
         String relatedProductTitle,
         String relatedProductImageUrl
 ) {
@@ -13,7 +13,7 @@ public record ProductBoughtTogetherResponse(
      */
     public static ProductBoughtTogetherResponse from(ProductBoughtTogetherDetailProjection row) {
         return new ProductBoughtTogetherResponse(
-                row.getRelatedProductId(),
+                String.valueOf(row.getRelatedProductId()),
                 row.getRelatedProductTitle(),
                 row.getRelatedProductImageUrl()
         );

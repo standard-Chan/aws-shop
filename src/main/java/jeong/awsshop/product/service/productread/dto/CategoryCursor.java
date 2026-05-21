@@ -3,7 +3,7 @@ package jeong.awsshop.product.service.productread.dto;
 import java.math.BigDecimal;
 
 public record CategoryCursor(
-        Long id,
+        String id,
         BigDecimal averageRating,
         Integer ratingNumber,
         BigDecimal price
