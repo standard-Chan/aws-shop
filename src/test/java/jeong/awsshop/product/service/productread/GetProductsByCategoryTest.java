@@ -60,6 +60,36 @@ class GetProductsByCategoryTest {
     }
 
     @Test
+    @DisplayName("averageRating ASC 정렬 요청이면 averageRating ASC repository 메서드를 호출해야 한다")
+    void should_call_average_rating_asc_repository_when_average_rating_sort_and_asc_direction_are_requested() {
+        // Given: averageRating ASC 정렬 첫 페이지 요청과 repository 응답
+        when(productRepository.findCategoryProductSummariesOrderByAverageRatingAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(projection(101L, "A-001", "Product A")));
+
+        // When: category 상품을 averageRating ASC 기준으로 조회한다
+        ProductCategoryCursorResponse response = productReadService.getProductsByCategory(
+                "HANDMADE",
+                2,
+                null,
+                "averageRating",
+                "asc"
+        );
+
+        // Then: averageRating ASC repository 메서드와 응답 DTO가 사용되어야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByAverageRatingAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        );
+        assertThat(response.products()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("ratingNumber 정렬 요청이면 ratingNumber repository 메서드를 호출해야 한다")
     void should_call_rating_number_repository_when_rating_number_sort_is_requested() {
         // Given: ratingNumber 정렬 첫 페이지 요청과 repository 응답

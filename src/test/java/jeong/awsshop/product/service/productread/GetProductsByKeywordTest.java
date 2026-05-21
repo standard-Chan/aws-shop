@@ -90,6 +90,33 @@ class GetProductsByKeywordTest {
     }
 
     @Test
+    @DisplayName("averageRating ASC 정렬 요청이면 averageRating ASC repository 메서드를 호출해야 한다")
+    void should_call_average_rating_asc_repository_when_average_rating_sort_and_asc_direction_are_requested() {
+        // Given: averageRating ASC 첫 페이지 요청과 repository 응답
+        when(productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                "wire",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(
+                projection(101L, "WIRE-001", "Silver Wire Basket", new BigDecimal("4.1"), 50, new BigDecimal("19.99"))
+        ));
+
+        // When: keyword 상품을 averageRating ASC 기준으로 조회한다
+        ProductCategoryCursorResponse response = productReadService.getProductsByKeyword(
+                "wire",
+                2,
+                null,
+                "averageRating",
+                "asc"
+        );
+
+        // Then: averageRating ASC repository 메서드와 응답 DTO가 사용되어야 한다
+        assertThat(response.products()).hasSize(1);
+        assertThat(response.products().getFirst().title()).isEqualTo("Silver Wire Basket");
+    }
+
+    @Test
     @DisplayName("keyword 앞뒤 공백은 제거한 뒤 검색해야 한다")
     void should_trim_keyword_before_search_when_keyword_has_surrounding_spaces() {
         // Given: trim 이후 keyword로만 조회되는 검색 결과를 준비한다.
@@ -304,6 +331,37 @@ class GetProductsByKeywordTest {
         assertThat(response.hasNext()).isTrue();
         assertThat(response.nextCursor().id()).isEqualTo("102");
         assertThat(response.nextCursor().averageRating()).isEqualByComparingTo("4.7");
+    }
+
+    @Test
+    @DisplayName("averageRating ASC 정렬에서 다음 페이지가 있으면 averageRating cursor를 반환해야 한다")
+    void should_return_next_cursor_when_average_rating_asc_sort_has_next() {
+        // Given: size + 1개의 averageRating ASC 검색 결과를 준비한다.
+        when(productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                "wire",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(
+                projection(101L, "WIRE-001", "Wire Null Score", new BigDecimal("4.1"), 80, new BigDecimal("9.99")),
+                projection(102L, "WIRE-002", "Travel Wire Pouch", new BigDecimal("4.3"), 60, new BigDecimal("12.99")),
+                projection(103L, "WIRE-003", "Wire Organizer Tray", new BigDecimal("4.5"), 40, new BigDecimal("14.99"))
+        ));
+
+        // When: averageRating ASC 기준 keyword 검색을 수행한다.
+        ProductCategoryCursorResponse response = productReadService.getProductsByKeyword(
+                "wire",
+                2,
+                null,
+                "averageRating",
+                "asc"
+        );
+
+        // Then: 최대 size만 반환하고 마지막 응답 상품 기준 cursor를 만든다.
+        assertThat(response.products()).hasSize(2);
+        assertThat(response.hasNext()).isTrue();
+        assertThat(response.nextCursor().id()).isEqualTo("102");
+        assertThat(response.nextCursor().averageRating()).isEqualByComparingTo("4.3");
     }
 
     @Test

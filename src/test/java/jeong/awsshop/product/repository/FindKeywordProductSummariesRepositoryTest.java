@@ -259,6 +259,25 @@ class FindKeywordProductSummariesRepositoryTest {
     }
 
     @Test
+    @DisplayName("averageRating ASC 첫 페이지는 average_rating ASC, id ASC로 조회해야 한다")
+    void should_find_products_ordered_by_average_rating_asc_and_id_asc_when_keyword_cursor_is_null() {
+        // Given: 같은 keyword 결과 집합에 서로 다른 averageRating과 같은 averageRating 상품이 있다.
+
+        // When: averageRating ASC 기준 첫 페이지를 조회한다.
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                        "wire",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: averageRating은 오름차순이어야 한다.
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getAverageRating)
+                .isSortedAccordingTo(BigDecimal::compareTo);
+    }
+
+    @Test
     @DisplayName("ratingNumber 첫 페이지는 rating_number DESC, id ASC로 조회해야 한다")
     void should_find_products_ordered_by_rating_number_desc_and_id_asc_when_keyword_cursor_is_null() {
         // Given: 같은 keyword 결과 집합에 서로 다른 ratingNumber 상품이 있다.
@@ -343,6 +362,37 @@ class FindKeywordProductSummariesRepositoryTest {
             boolean sameRatingAndGreaterId = row.getAverageRating().compareTo(cursor.getAverageRating()) == 0
                     && row.getId() > cursor.getId();
             assertThat(lowerRating || sameRatingAndGreaterId).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("averageRating ASC cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
+    void should_find_next_products_by_average_rating_asc_cursor_when_keyword_cursor_exists() {
+        // Given: averageRating ASC 첫 페이지에서 두 번째 row를 cursor로 선택한다.
+        List<ProductSummaryNativeProjection> firstPage =
+                productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                        "wire",
+                        null,
+                        null,
+                        20
+                );
+        ProductSummaryNativeProjection cursor = firstPage.get(1);
+
+        // When: cursor 이후 averageRating ASC 페이지를 조회한다.
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                        "wire",
+                        cursor.getId(),
+                        cursor.getAverageRating(),
+                        20
+                );
+
+        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다.
+        assertThat(rows).allSatisfy(row -> {
+            boolean higherRating = row.getAverageRating().compareTo(cursor.getAverageRating()) > 0;
+            boolean sameRatingAndGreaterId = row.getAverageRating().compareTo(cursor.getAverageRating()) == 0
+                    && row.getId() > cursor.getId();
+            assertThat(higherRating || sameRatingAndGreaterId).isTrue();
         });
     }
 

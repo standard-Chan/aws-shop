@@ -106,6 +106,31 @@ class FindCategoryProductSummariesRepositoryTest {
     }
 
     @Test
+    @DisplayName("averageRating 및 정렬을 average_rating ASC로 한 경우, id ASC로 조회해야 한다")
+    void should_find_products_ordered_by_average_rating_asc_and_id_asc_when_cursor_is_null() {
+        // Given: 같은 category 안에 서로 다른 averageRating과 같은 averageRating 상품이 있다
+
+        // When: averageRating ASC 기준 첫 페이지를 조회한다
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findCategoryProductSummariesOrderByAverageRatingAsc(
+                        "HANDMADE",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: averageRating은 오름차순이어야 한다
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getAverageRating)
+                .isSortedAccordingTo(BigDecimal::compareTo);
+
+        // Then: 같은 averageRating 4.0 상품은 id 오름차순이어야 한다
+        assertThat(rows.stream()
+                .filter(row -> row.getAverageRating().compareTo(new BigDecimal("4.0")) == 0)
+                .map(ProductSummaryNativeProjection::getId)
+                .toList()).isSorted();
+    }
+
+    @Test
     @DisplayName("averageRating cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
     void should_find_next_products_by_average_rating_cursor_when_cursor_exists() {
         // Given: averageRating 첫 페이지에서 두 번째 row를 cursor로 선택한다
