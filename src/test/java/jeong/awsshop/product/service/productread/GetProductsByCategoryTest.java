@@ -120,6 +120,36 @@ class GetProductsByCategoryTest {
     }
 
     @Test
+    @DisplayName("ratingNumber ASC 정렬 요청이면 ratingNumber ASC repository 메서드를 호출해야 한다")
+    void should_call_rating_number_asc_repository_when_rating_number_sort_and_asc_direction_are_requested() {
+        // Given: ratingNumber ASC 정렬 첫 페이지 요청과 repository 응답
+        when(productRepository.findCategoryProductSummariesOrderByRatingNumberAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        )).thenReturn(List.of(projection(101L, "A-001", "Product A")));
+
+        // When: category 상품을 ratingNumber ASC 기준으로 조회한다
+        ProductCategoryCursorResponse response = productReadService.getProductsByCategory(
+                "HANDMADE",
+                2,
+                null,
+                "ratingNumber",
+                "asc"
+        );
+
+        // Then: ratingNumber ASC repository 메서드와 응답 DTO가 사용되어야 한다
+        verify(productRepository).findCategoryProductSummariesOrderByRatingNumberAsc(
+                "HANDMADE",
+                null,
+                null,
+                3
+        );
+        assertThat(response.products()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("price ASC 정렬 요청이면 price ASC repository 메서드를 호출해야 한다")
     void should_call_price_asc_repository_when_price_sort_and_asc_direction_are_requested() {
         // Given: price ASC 첫 페이지 요청과 repository 응답

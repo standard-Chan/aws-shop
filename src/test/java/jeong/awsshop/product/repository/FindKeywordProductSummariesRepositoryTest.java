@@ -297,6 +297,25 @@ class FindKeywordProductSummariesRepositoryTest {
     }
 
     @Test
+    @DisplayName("ratingNumber ASC 첫 페이지는 rating_number ASC, id ASC로 조회해야 한다")
+    void should_find_products_ordered_by_rating_number_asc_and_id_asc_when_keyword_cursor_is_null() {
+        // Given: 같은 keyword 결과 집합에 서로 다른 ratingNumber 상품이 있다.
+
+        // When: ratingNumber ASC 기준 첫 페이지를 조회한다.
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findKeywordProductSummariesOrderByRatingNumberAsc(
+                        "wire",
+                        null,
+                        null,
+                        20
+                );
+
+        // Then: ratingNumber는 오름차순이어야 한다.
+        assertThat(rows).extracting(ProductSummaryNativeProjection::getRatingNumber)
+                .isSortedAccordingTo(Integer::compareTo);
+    }
+
+    @Test
     @DisplayName("price ASC 첫 페이지는 price ASC, id ASC로 조회해야 한다")
     void should_find_products_ordered_by_price_asc_and_id_asc_when_keyword_cursor_is_null() {
         // Given: 같은 keyword 결과 집합에 여러 price 상품이 있다.
@@ -424,6 +443,37 @@ class FindKeywordProductSummariesRepositoryTest {
             boolean sameRatingNumberAndGreaterId = row.getRatingNumber().equals(cursor.getRatingNumber())
                     && row.getId() > cursor.getId();
             assertThat(lowerRatingNumber || sameRatingNumberAndGreaterId).isTrue();
+        });
+    }
+
+    @Test
+    @DisplayName("ratingNumber ASC cursor가 있으면 cursor 이후 페이지를 조회해야 한다")
+    void should_find_next_products_by_rating_number_asc_cursor_when_keyword_cursor_exists() {
+        // Given: ratingNumber ASC 첫 페이지에서 두 번째 row를 cursor로 선택한다.
+        List<ProductSummaryNativeProjection> firstPage =
+                productRepository.findKeywordProductSummariesOrderByRatingNumberAsc(
+                        "wire",
+                        null,
+                        null,
+                        20
+                );
+        ProductSummaryNativeProjection cursor = firstPage.get(1);
+
+        // When: cursor 이후 ratingNumber ASC 페이지를 조회한다.
+        List<ProductSummaryNativeProjection> rows =
+                productRepository.findKeywordProductSummariesOrderByRatingNumberAsc(
+                        "wire",
+                        cursor.getId(),
+                        cursor.getRatingNumber(),
+                        20
+                );
+
+        // Then: 결과는 cursor 정렬 위치 이후의 상품이어야 한다.
+        assertThat(rows).allSatisfy(row -> {
+            boolean higherRatingNumber = row.getRatingNumber() > cursor.getRatingNumber();
+            boolean sameRatingNumberAndGreaterId = row.getRatingNumber().equals(cursor.getRatingNumber())
+                    && row.getId() > cursor.getId();
+            assertThat(higherRatingNumber || sameRatingNumberAndGreaterId).isTrue();
         });
     }
 
