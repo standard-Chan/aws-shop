@@ -5,7 +5,7 @@ import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjectio
 
 public record ProductCursorResponse(
         List<ProductSummaryResponse> products,
-        Long nextCursorId,
+        String nextCursorId,
         boolean hasNext
 ) {
 
@@ -20,7 +20,7 @@ public record ProductCursorResponse(
                 .toList();
 
         // 마지막 값은 다음 페이지의 시작점이 된다. 만약 조회된 데이터가 없다면 null로 설정한다.
-        Long nextCursorId = products.isEmpty() ? null : products.getLast().id();
+        String nextCursorId = products.isEmpty() ? null : products.getLast().id();
 
         return new ProductCursorResponse(products, nextCursorId, hasNext);
     }

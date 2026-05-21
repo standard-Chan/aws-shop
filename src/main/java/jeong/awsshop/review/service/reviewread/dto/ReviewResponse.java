@@ -5,7 +5,7 @@ import jeong.awsshop.review.repository.projection.ReviewImageProjection;
 import jeong.awsshop.review.repository.projection.ReviewSummaryProjection;
 
 public record ReviewResponse(
-        Long id,
+        String id,
         Float rating,
         String title,
         String text,
@@ -26,7 +26,7 @@ public record ReviewResponse(
             List<ReviewImageProjection> images
     ) {
         return new ReviewResponse(
-                row.getId(),
+                String.valueOf(row.getId()),
                 row.getRating(),
                 row.getTitle(),
                 row.getText(),

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 
 public record ProductSummaryResponse(
-        Long id,
+        String id,
         String parentAsin,
         String title,
         String mainCategory,
@@ -20,7 +20,7 @@ public record ProductSummaryResponse(
      */
     public static ProductSummaryResponse from(ProductSummaryNativeProjection row) {
         return new ProductSummaryResponse(
-                row.getId(),
+                String.valueOf(row.getId()),
                 row.getParentAsin(),
                 row.getTitle(),
                 row.getMainCategory(),
