@@ -176,6 +176,14 @@ public class ProductReadService {
                     limit
             );
         }
+        if (direction == CategoryProductDirection.ASC) {
+            return productRepository.findCategoryProductSummariesOrderByAverageRatingAsc(
+                    mainCategory,
+                    cursorId,
+                    averageRatingOf(cursorProduct),
+                    limit
+            );
+        }
         return productRepository.findCategoryProductSummariesOrderByAverageRating(
                 mainCategory,
                 cursorId,
@@ -216,6 +224,14 @@ public class ProductReadService {
                     keyword,
                     cursorId,
                     priceOf(cursorProduct),
+                    limit
+            );
+        }
+        if (direction == CategoryProductDirection.ASC) {
+            return productRepository.findKeywordProductSummariesOrderByAverageRatingAsc(
+                    keyword,
+                    cursorId,
+                    averageRatingOf(cursorProduct),
                     limit
             );
         }

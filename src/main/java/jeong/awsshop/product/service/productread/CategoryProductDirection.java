@@ -11,9 +11,9 @@ public enum CategoryProductDirection {
      * 외부 query parameter를 내부 정렬 방향으로 해석한다.
      */
     public static CategoryProductDirection from(String direction) {
-        if ("desc".equalsIgnoreCase(direction)) {
-            return DESC;
+        if ("asc".equalsIgnoreCase(direction)) {
+            return ASC;
         }
-        return ASC;
+        return DESC;
     }
 }
