@@ -347,7 +347,7 @@ class GetProductsByCategoryTest {
         // Then: 응답 마지막 상품 기준으로 averageRating cursor를 만들어야 한다
         CategoryCursor nextCursor = response.nextCursor();
         assertThat(response.hasNext()).isTrue();
-        assertThat(nextCursor.id()).isEqualTo(102L);
+        assertThat(nextCursor.id()).isEqualTo("102");
         assertThat(nextCursor.averageRating()).isEqualByComparingTo("4.5");
         assertThat(nextCursor.ratingNumber()).isNull();
     }
@@ -379,7 +379,7 @@ class GetProductsByCategoryTest {
         // Then: 응답 마지막 상품 기준으로 ratingNumber cursor를 만들어야 한다
         CategoryCursor nextCursor = response.nextCursor();
         assertThat(response.hasNext()).isTrue();
-        assertThat(nextCursor.id()).isEqualTo(102L);
+        assertThat(nextCursor.id()).isEqualTo("102");
         assertThat(nextCursor.averageRating()).isNull();
         assertThat(nextCursor.ratingNumber()).isEqualTo(12);
     }
@@ -411,7 +411,7 @@ class GetProductsByCategoryTest {
         // Then: 응답 마지막 상품 기준으로 price cursor를 만들어야 한다
         CategoryCursor nextCursor = response.nextCursor();
         assertThat(response.hasNext()).isTrue();
-        assertThat(nextCursor.id()).isEqualTo(102L);
+        assertThat(nextCursor.id()).isEqualTo("102");
         assertThat(nextCursor.averageRating()).isNull();
         assertThat(nextCursor.ratingNumber()).isNull();
         assertThat(nextCursor.price()).isEqualByComparingTo("19.99");

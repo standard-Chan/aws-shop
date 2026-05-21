@@ -58,7 +58,7 @@ class GetProductsTest {
 
         // Then: 첫 페이지 결과가 id 순서대로 반환되어야 한다
         assertThat(response.products()).extracting(ProductSummaryResponse::id)
-                .containsExactly(101L, 102L);
+                .containsExactly("101", "102");
         verify(productRepository).findProductSummaries(isNull(), eq(3));
     }
 
@@ -76,7 +76,7 @@ class GetProductsTest {
 
         // Then: cursor 이후 결과가 반환되어야 한다
         assertThat(response.products()).extracting(ProductSummaryResponse::id)
-                .containsExactly(9_000_000_000_100L);
+                .containsExactly("9000000000100");
         verify(productRepository).findProductSummaries(cursor, 3);
     }
 
@@ -131,7 +131,7 @@ class GetProductsTest {
         ProductCursorResponse response = productReadService.getProducts(2, null);
 
         // Then: 마지막 응답 상품 id가 nextCursorId가 되어야 한다
-        assertThat(response.nextCursorId()).isEqualTo(102L);
+        assertThat(response.nextCursorId()).isEqualTo("102");
     }
 
     @Test
@@ -176,7 +176,7 @@ class GetProductsTest {
 
         // Then: Product 필드가 응답 DTO에 매핑되어야 한다
         ProductSummaryResponse product = response.products().getFirst();
-        assertThat(product.id()).isEqualTo(101L);
+        assertThat(product.id()).isEqualTo("101");
         assertThat(product.parentAsin()).isEqualTo("A-001");
         assertThat(product.title()).isEqualTo("Product A");
         assertThat(product.mainCategory()).isEqualTo("HANDMADE");

@@ -73,7 +73,7 @@ class GetProductsControllerTest {
                 "main-hires"
         );
         ProductSummaryResponse product = new ProductSummaryResponse(
-                101L,
+                "101",
                 "B07NTK7T5P",
                 "Daisy Keychain Wristlet Gray Fabric Key fob Lanyard",
                 "HANDMADE",
@@ -83,16 +83,16 @@ class GetProductsControllerTest {
                 "Generic",
                 image
         );
-        ProductCursorResponse response = new ProductCursorResponse(List.of(product), 101L, true);
+        ProductCursorResponse response = new ProductCursorResponse(List.of(product), "101", true);
         when(productReadService.getProducts(1, null)).thenReturn(response);
 
         // When & Then: controller는 service 응답을 JSON으로 반환해야 한다
         mockMvc.perform(get("/api/products").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products[0].id").value(101L))
+                .andExpect(jsonPath("$.products[0].id").value("101"))
                 .andExpect(jsonPath("$.products[0].parentAsin").value("B07NTK7T5P"))
                 .andExpect(jsonPath("$.products[0].image.variant").value("MAIN"))
-                .andExpect(jsonPath("$.nextCursorId").value(101L))
+                .andExpect(jsonPath("$.nextCursorId").value("101"))
                 .andExpect(jsonPath("$.hasNext").value(true));
     }
 

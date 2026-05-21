@@ -302,7 +302,7 @@ class GetProductsByKeywordTest {
         // Then: 최대 size만 반환하고 마지막 응답 상품 기준 cursor를 만든다.
         assertThat(response.products()).hasSize(2);
         assertThat(response.hasNext()).isTrue();
-        assertThat(response.nextCursor().id()).isEqualTo(102L);
+        assertThat(response.nextCursor().id()).isEqualTo("102");
         assertThat(response.nextCursor().averageRating()).isEqualByComparingTo("4.7");
     }
 
@@ -333,7 +333,7 @@ class GetProductsByKeywordTest {
         // Then: 최대 size만 반환하고 마지막 응답 상품 기준 cursor를 만든다.
         assertThat(response.products()).hasSize(2);
         assertThat(response.hasNext()).isTrue();
-        assertThat(response.nextCursor().id()).isEqualTo(102L);
+        assertThat(response.nextCursor().id()).isEqualTo("102");
         assertThat(response.nextCursor().ratingNumber()).isEqualTo(60);
     }
 
@@ -364,7 +364,7 @@ class GetProductsByKeywordTest {
         // Then: 최대 size만 반환하고 마지막 응답 상품 기준 cursor를 만든다.
         assertThat(response.products()).hasSize(2);
         assertThat(response.hasNext()).isTrue();
-        assertThat(response.nextCursor().id()).isEqualTo(102L);
+        assertThat(response.nextCursor().id()).isEqualTo("102");
         assertThat(response.nextCursor().price()).isEqualByComparingTo("12.99");
     }
 

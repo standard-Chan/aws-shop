@@ -71,7 +71,7 @@ class GetProductDetailTest {
         ProductDetailResponse response = productReadService.getProductDetail(productId);
 
         // Then: Product 본문 필드는 모두 응답에 포함되어야 한다
-        assertThat(response.id()).isEqualTo(productId);
+        assertThat(response.id()).isEqualTo(String.valueOf(productId));
         assertThat(response.parentAsin()).isEqualTo("B07NK78DVV");
         assertThat(response.title()).isEqualTo("Psychedelic Swirls Key Fob");
         assertThat(response.averageRating()).isEqualByComparingTo("4.9");

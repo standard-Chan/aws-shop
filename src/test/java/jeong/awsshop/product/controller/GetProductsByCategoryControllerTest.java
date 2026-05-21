@@ -60,7 +60,7 @@ class GetProductsByCategoryControllerTest {
         Long cursorId = 9_000_000_000_000L;
         ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
                 List.of(),
-                new CategoryCursor(cursorId, null, null, null),
+                new CategoryCursor(String.valueOf(cursorId), null, null, null),
                 false
         );
         when(productReadService.getProductsByCategory(
@@ -97,7 +97,7 @@ class GetProductsByCategoryControllerTest {
         Long cursorId = 9_000_000_000_000L;
         ProductCategoryCursorResponse response = new ProductCategoryCursorResponse(
                 List.of(),
-                new CategoryCursor(cursorId, null, null, null),
+                new CategoryCursor(String.valueOf(cursorId), null, null, null),
                 false
         );
         when(productReadService.getProductsByCategory(

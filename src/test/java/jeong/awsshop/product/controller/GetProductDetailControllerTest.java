@@ -62,7 +62,7 @@ class GetProductDetailControllerTest {
         // When & Then: controller는 service 응답을 HTTP JSON으로 직렬화해야 한다
         mockMvc.perform(get("/api/products/{id}", productId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(productId))
+                .andExpect(jsonPath("$.id").value(String.valueOf(productId)))
                 .andExpect(jsonPath("$.parentAsin").value("B07NK78DVV"))
                 .andExpect(jsonPath("$.title").value("Psychedelic Swirls Key Fob"))
                 .andExpect(jsonPath("$.details.Department").value("unisex-adult"))
@@ -106,7 +106,7 @@ class GetProductDetailControllerTest {
     private ProductDetailResponse detailResponse(Long productId) {
         // 상세 응답 fixture: Product 본문과 모든 child collection을 포함한다
         return new ProductDetailResponse(
-                productId,
+                String.valueOf(productId),
                 "B07NK78DVV",
                 "Psychedelic Swirls Key Fob",
                 "HANDMADE",
@@ -119,7 +119,7 @@ class GetProductDetailControllerTest {
                 List.of(new ProductDescriptionResponse(0, "A colorful way to carry your keys")),
                 List.of(new ProductCategoryResponse("Handmade Products")),
                 List.of(new ProductBoughtTogetherResponse(
-                        9_000_000_000_001L,
+                        "9000000000001",
                         "Related product",
                         "related-image"
                 )),
