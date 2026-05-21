@@ -68,7 +68,7 @@ class ReviewReadServiceTest {
 
         // Then: 기본 정렬 순서와 size + 1 조회 계약이 유지되어야 한다.
         assertThat(response.reviews()).extracting(ReviewResponse::id)
-                .containsExactly(20002L, 20001L);
+                .containsExactly("20002", "20001");
         verify(reviewRepository).findReviewSummaries(
                 eq("B096MTTDJL"),
                 eq("helpfulVote"),
@@ -116,7 +116,7 @@ class ReviewReadServiceTest {
 
         // Then: helpfulVote가 null인 리뷰는 응답에 포함되면 안 된다.
         assertThat(response.reviews()).extracting(ReviewResponse::id)
-                .containsExactly(20002L, 20001L);
+                .containsExactly("20002", "20001");
     }
 
     @Test
@@ -191,7 +191,7 @@ class ReviewReadServiceTest {
 
         // Then: rating null row는 응답에 포함되면 안 된다.
         assertThat(response.reviews()).extracting(ReviewResponse::id)
-                .containsExactly(20002L, 20004L);
+                .containsExactly("20002", "20004");
     }
 
     @Test
@@ -271,7 +271,7 @@ class ReviewReadServiceTest {
         );
 
         // Then: 마지막 리뷰의 cursor 정보가 응답에 반영되어야 한다.
-        assertThat(response.nextCursor().id()).isEqualTo(20001L);
+        assertThat(response.nextCursor().id()).isEqualTo("20001");
         assertThat(response.nextCursor().timestamp()).isEqualTo(1653846936825L);
         assertThat(response.nextCursor().helpfulVote()).isEqualTo(11);
     }

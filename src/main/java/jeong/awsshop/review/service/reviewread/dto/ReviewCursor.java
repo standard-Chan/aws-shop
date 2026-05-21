@@ -1,7 +1,7 @@
 package jeong.awsshop.review.service.reviewread.dto;
 
 public record ReviewCursor(
-        Long id,
+        String id,
         Long timestamp,
         Integer helpfulVote,
         Float rating
