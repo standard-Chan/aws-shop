@@ -4,12 +4,13 @@ import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
+import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.order.OrderClient;
+import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
@@ -35,8 +36,10 @@ public class PaymentService {
      * @param request
      * @return psp 결제 URL
      */
+    // TODO : 현재는 사용자가 이를 호출하지만, 실제로는 주문이 생성될 때 주문 서비스에서 이를 호출하는 형태가 되어야한다.
     public PaymentResponse createPayment(CreatePaymentRequest request) {
         log.info("[Payment] 결제 생성 orderId={}", request.orderId());
+
         OrderSummary order;
         try {
             // 주문 정보 조회
@@ -76,34 +79,36 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
-        // 검증
-        payment.start();
-        payment.confirm(confirmRequest.amount());
-
         try {
+            // 검증
+            payment.start();
+            payment.confirm(confirmRequest.amount());
             // toss 결제 승인 요청
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(confirmRequest);
 
             // 결제 승인 완료
             payment.complete();
 
-            // TODO : Order 완료 처리
-            // TODO : 재고 감소 처리
-
             log.info("[Payment] 결제 승인 완료. paymentKey={}, orderId={}, amount={}",
                 response.paymentKey(), response.orderId(), response.totalAmount());
 
+            // TODO : Order 완료 처리
+            // TODO : 재고 감소 처리
+
             return response;
-        } catch (RuntimeException exception) {
+        } catch (PaymentException exception) {
             // 해당 결제 실패 처리
-            // TODO : 결제 상태 변경
+            payment.fail();
+
             // TODO : Order 실패 처리
-            // TODO : 재고 원복 처리
 
             log.warn("[Payment] 결제 실패. paymentKey={}, orderId={}, amount={}",
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
-            throw new PaymentConfirmExternalException(confirmRequest.paymentId(), confirmRequest.paymentKey(),
+            throw new PaymentConfirmExternalException(confirmRequest.paymentId(),
+                confirmRequest.paymentKey(),
                 exception);
+        } catch (Exception e) {
+            throw new PaymentException("[Payment] 알 수 없는 에러가 발생하였습니다.", e);
         }
     }
 }

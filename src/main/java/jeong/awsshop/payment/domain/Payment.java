@@ -64,6 +64,19 @@ public class Payment {
 
     /** 결제 완료 처리 */
     public void complete() {
+        if (this.status != PaymentStatus.EXECUTING) {
+            throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status);
+        }
         this.status = PaymentStatus.SUCCESS;
+    }
+
+    /** 결제 실패 처리 */
+    public void fail() {
+        // 결제 실패는 결제 진행 중인 상태에서만 가능하다.
+        // 만약, SUCCESS 상태에서 취소가 된 경우, 잘못된 로직이므로 반드시 수정이 필요하다.
+        if (this.status != PaymentStatus.EXECUTING) {
+            throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status, "결제 실패 처리 중 상태 예외가 발생하였습니다.");
+        }
+        this.status = PaymentStatus.FAILED;
     }
 }
