@@ -69,13 +69,17 @@ public class Payment {
         }
     }
 
-    /** 결제 승인 요청 검증 */
+    /** 결제 승인 요청 검증
+     * Toss payment가 원화를 지원하기 때문에, FE에서 전달하는 amount 값과 toss에 confirm 해야하는 amount 값이 원화로 변환되어야함.
+     * */
     public void confirm(BigDecimal requestedAmount) {
+        long DOLLAR = 1400L;
+
         if (requestedAmount.compareTo(BigDecimal.ZERO) < 0) {
             throw new PaymentInvalidAmountException(requestedAmount);
         }
 
-        if (this.amount.compareTo(requestedAmount) != 0) {
+        if (this.amount.multiply(new BigDecimal(DOLLAR)).compareTo(requestedAmount) != 0) {
             throw new PaymentAmountMismatchException(this.amount, requestedAmount);
         }
 
