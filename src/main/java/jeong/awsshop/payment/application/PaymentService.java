@@ -47,6 +47,7 @@ public class PaymentService {
 
         // 결제 Entity 생성
         Payment payment = Payment.builder()
+            .id(snowflakeIdGenerator.nextId())
             .orderId(request.orderId())
             .amount(order.totalAmount())
             .status(PaymentStatus.NOT_STARTED)
