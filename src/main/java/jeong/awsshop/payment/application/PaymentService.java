@@ -4,6 +4,9 @@ import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.domain.dto.OrderSummary;
+import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
+import jeong.awsshop.payment.exception.PaymentNotFoundException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.OrderClient;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmRequest;
@@ -32,8 +35,13 @@ public class PaymentService {
      */
     public PaymentResponse createPayment(CreatePaymentRequest request) {
         log.info("[Payment] 결제 생성 orderId={}", request.orderId());
-        // 주문 정보 조회
-        OrderSummary order = orderClient.getOrder(request.orderId());
+        OrderSummary order;
+        try {
+            // 주문 정보 조회
+            order = orderClient.getOrder(request.orderId());
+        } catch (RuntimeException exception) {
+            throw new PaymentOrderLookupException(request.orderId(), exception);
+        }
 
         // 결제 Entity 생성
         Payment payment = Payment.builder()
@@ -63,29 +71,36 @@ public class PaymentService {
             confirmRequest.orderId(), confirmRequest.amount());
 
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
-            .orElseThrow(() -> new IllegalArgumentException("[Payment] 결제 정보를 찾을 수 없습니다."));
+            .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
+
+        // 검증
+        payment.start();
+        payment.confirm(confirmRequest.amount());
 
         try {
-            // 검증
-            payment.start();
-            payment.confirm(confirmRequest.amount());
-
             // toss 결제 승인 요청
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(confirmRequest);
 
-            // 승인 완료
+            // 결제 승인 완료
             payment.complete();
+
+            // TODO : Order 완료 처리
+            // TODO : 재고 감소 처리
+
             log.info("[Payment] 결제 승인 완료. paymentKey={}, orderId={}, amount={}",
                 response.paymentKey(), response.orderId(), response.totalAmount());
 
             return response;
-        } catch (Exception e) {
+        } catch (RuntimeException exception) {
             // 해당 결제 실패 처리
-            // 상태 변경
+            // TODO : 결제 상태 변경
+            // TODO : Order 실패 처리
+            // TODO : 재고 원복 처리
 
             log.warn("[Payment] 결제 실패. paymentKey={}, orderId={}, amount={}",
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
-            throw e;
+            throw new PaymentConfirmExternalException(confirmRequest.paymentId(), confirmRequest.paymentKey(),
+                exception);
         }
     }
 }
