@@ -53,4 +53,43 @@ public class OrderService {
         return OrderSummaryResponse.from(order);
     }
 
+    /**
+     * 결제 처리 실패 후 주문을 pending 상태로 전환
+     */
+    @Transactional
+    public OrderSummaryResponse pendingOrder(Long id) {
+        Order order = orderRepository.findById(id)
+            .orElseThrow(
+                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+
+        order.pending();
+        return OrderSummaryResponse.from(order);
+    }
+
+    /**
+     * 주문 성공 상태 갱신
+     */
+    @Transactional
+    public OrderSummaryResponse completeOrder(Long id) {
+        Order order = orderRepository.findById(id)
+            .orElseThrow(
+                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+
+        order.complete();
+        return OrderSummaryResponse.from(order);
+    }
+
+    /**
+     * 주문 실패 상태 갱신
+     */
+    @Transactional
+    public OrderSummaryResponse cancelOrder(Long id) {
+        Order order = orderRepository.findById(id)
+            .orElseThrow(
+                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+
+        order.cancel();
+        return OrderSummaryResponse.from(order);
+    }
+
 }

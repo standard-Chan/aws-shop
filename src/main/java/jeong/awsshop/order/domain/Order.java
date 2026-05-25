@@ -50,4 +50,16 @@ public class Order {
             .shippingAddress("Seoul Songpa-gu Olympic-ro 300")
             .build();
     }
+
+    public void pending() {
+        this.status = OrderStatus.PENDING;
+    }
+
+    public void complete() {
+        this.status = OrderStatus.COMPLETED;
+    }
+
+    public void cancel() {
+        this.status = OrderStatus.CANCELED;
+    }
 }

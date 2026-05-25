@@ -26,4 +26,19 @@ public class OrderController {
         return orderService.getOrder(id);
     }
 
+    @PostMapping("{id}/pending")
+    public OrderSummaryResponse pendingOrder(@PathVariable("id") Long id) {
+        return orderService.pendingOrder(id);
+    }
+
+    @PostMapping("{id}/success")
+    public OrderSummaryResponse completeOrder(@PathVariable("id") Long id) {
+        return orderService.completeOrder(id);
+    }
+
+    @PostMapping("{id}/fail")
+    public OrderSummaryResponse cancelOrder(@PathVariable("id") Long id) {
+        return orderService.cancelOrder(id);
+    }
+
 }
