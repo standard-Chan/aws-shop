@@ -2,8 +2,8 @@ package jeong.awsshop.payment.infrastructure;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmRequest;
-import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmResponse;
+import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
+import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;

@@ -1,4 +1,4 @@
-package jeong.awsshop.payment.infrastructure.dto;
+package jeong.awsshop.payment.infrastructure.tosspayment.dto;
 
 import java.math.BigDecimal;
 
