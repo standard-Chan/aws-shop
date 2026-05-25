@@ -24,3 +24,8 @@ spring:
     level:
       org.hibernate.SQL: debug
       org.hibernate.type.descriptor.sql: trace
+
+# ip 경로 설정
+external-api:
+  order-server:
+    base-url: http://localhost:8080
