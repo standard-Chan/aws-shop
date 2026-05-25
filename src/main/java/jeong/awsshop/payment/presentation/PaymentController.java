@@ -2,8 +2,8 @@ package jeong.awsshop.payment.presentation;
 
 import jeong.awsshop.payment.application.PaymentService;
 import jeong.awsshop.payment.domain.PaymentRepository;
-import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
+import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ public class PaymentController {
 
     @PostMapping("/confirm")
     public TossPaymentConfirmResponse confirmPayment(
-        @RequestBody TossPaymentConfirmRequest request) {
+        @RequestBody ConfirmPaymentRequest request) {
         return paymentService.confirmPayment(request);
     }
 

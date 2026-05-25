@@ -29,6 +29,7 @@ public class TossPaymentClient {
     * Toss Payments 서버로부터 결제 정보를 받아온다.
     */
     public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
+
         try {
             String encodedSecretKey = Base64.getEncoder()
                 .encodeToString(
@@ -47,7 +48,7 @@ public class TossPaymentClient {
                 .retrieve()
                 .body(TossPaymentConfirmResponse.class);
         } catch (Exception e) {
-            throw new PaymentTossPaymentProcessingException(request.paymentId(), request.paymentKey(), e.getMessage(), e);
+            throw new PaymentTossPaymentProcessingException(request.orderId(), request.paymentKey(), e.getMessage(), e);
         }
     }
 
