@@ -1,16 +1,17 @@
 package jeong.awsshop.payment.application;
 
+import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.domain.dto.OrderSummary;
+import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.OrderClient;
+import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
-import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmRequest;
-import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmResponse;
+import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
+import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class PaymentService {
     private final OrderClient orderClient;
     private final PaymentRepository paymentRepository;
     private final TossPaymentClient tossPaymentClient;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     /**
      * 주문 id에 해당하는 결제를 생성하여 반환한다.
@@ -46,7 +48,7 @@ public class PaymentService {
         // 결제 Entity 생성
         Payment payment = Payment.builder()
             .orderId(request.orderId())
-            .amount(order.getTotalPrice())
+            .amount(order.totalAmount())
             .status(PaymentStatus.NOT_STARTED)
             .build();
         Payment savedPayment = paymentRepository.save(payment);
