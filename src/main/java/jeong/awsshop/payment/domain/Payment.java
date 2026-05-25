@@ -4,14 +4,13 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import jeong.awsshop.payment.exception.PaymentAmountMismatchException;
 import jeong.awsshop.payment.exception.PaymentInvalidAmountException;
 import jeong.awsshop.payment.exception.PaymentInvalidStatusException;
+import jeong.awsshop.payment.exception.PaymentOrderIdMismatchException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,6 +44,13 @@ public class Payment {
             throw new PaymentInvalidStatusException(PaymentStatus.NOT_STARTED, this.status);
         }
         this.status = PaymentStatus.EXECUTING;
+    }
+
+    /** 주문 id 동일 검증 */
+    public void validateOrderId(Long requestedOrderId) {
+        if (!this.orderId.equals(requestedOrderId)) {
+            throw new PaymentOrderIdMismatchException(this.orderId, requestedOrderId);
+        }
     }
 
     /** 결제 승인 요청 검증 */

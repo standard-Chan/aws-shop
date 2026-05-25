@@ -27,4 +27,47 @@ public class OrderClient {
 
         return response;
     }
+
+    /**
+     * order server에 해당 id 주문의 상태를 COMPLETED로 갱신한다.
+     * 사용 시기 : 결제 처리가 완료된 시점
+     */
+    public OrderSummary updateCompleteOrder(Long orderId) {
+        OrderSummary response = orderRestClient.post()
+            .uri("/api/orders/{orderId}/success", orderId)
+            .retrieve()
+            .body(OrderSummary.class);
+
+        if (response == null) {
+            throw new PaymentOrderLookupException(orderId, "Order 상태를 COMPLETED 로 갱신하지 못 했습니다.");
+        }
+
+        return response;
+    }
+
+    public OrderSummary updateCancelOrder(Long orderId) {
+        OrderSummary response = orderRestClient.post()
+            .uri("/api/orders/{orderId}/fail", orderId)
+            .retrieve()
+            .body(OrderSummary.class);
+
+        if (response == null) {
+            throw new PaymentOrderLookupException(orderId, "Order 상태를 CANCELED 로 갱신하지 못 했습니다.");
+        }
+
+        return response;
+    }
+
+    public OrderSummary updatePendingOrder(Long orderId) {
+        OrderSummary response = orderRestClient.post()
+            .uri("/api/orders/{orderId}/pending", orderId)
+            .retrieve()
+            .body(OrderSummary.class);
+
+        if (response == null) {
+            throw new PaymentOrderLookupException(orderId, "Order 상태를 PENDING 으로 갱신하지 못 했습니다.");
+        }
+
+        return response;
+    }
 }

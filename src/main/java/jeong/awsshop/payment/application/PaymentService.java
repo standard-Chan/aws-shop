@@ -82,6 +82,7 @@ public class PaymentService {
         try {
             // 검증
             payment.start();
+            payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
             // toss 결제 승인 요청
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(confirmRequest);
@@ -92,7 +93,9 @@ public class PaymentService {
             log.info("[Payment] 결제 승인 완료. paymentKey={}, orderId={}, amount={}",
                 response.paymentKey(), response.orderId(), response.totalAmount());
 
-            // TODO : Order 완료 처리
+            // Order 완료 처리
+            orderClient.updateCompleteOrder(payment.getOrderId());
+
             // TODO : 재고 감소 처리
 
             return response;
@@ -100,14 +103,17 @@ public class PaymentService {
             // 해당 결제 실패 처리
             payment.fail();
 
-            // TODO : Order 실패 처리
+            // Order 상태 pending 변경
+            orderClient.updatePendingOrder(payment.getOrderId());
+
+            // TODO : 만약 재고가 감소된 상태라면, 재고 복구 처리 (재고 감소가 마지막이므로 로직상 문제가 없다면, 재고 감소가 실패한 경우는 없을 것이다.)
 
             log.warn("[Payment] 결제 실패. paymentKey={}, orderId={}, amount={}",
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
             throw new PaymentConfirmExternalException(confirmRequest.paymentId(),
-                confirmRequest.paymentKey(),
-                exception);
+                confirmRequest.paymentKey(), exception);
         } catch (Exception e) {
+            log.error(e.getMessage());
             throw new PaymentException("[Payment] 알 수 없는 에러가 발생하였습니다.", e);
         }
     }

@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public record TossPaymentConfirmRequest (
     Long paymentId,
     String paymentKey,
-    String orderId,
+    Long orderId,
     BigDecimal amount
 ) {
 }
