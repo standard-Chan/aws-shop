@@ -5,6 +5,7 @@ import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
+import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,11 +23,10 @@ public class PaymentController {
     private final TossPaymentClient tossPaymentClient;
 
     @PostMapping()
-    public String getPaymentUrl(@RequestBody CreatePaymentRequest request) {
-        log.info("[Payment] 결제 생성 및 URL 요청. orderId={}", request.orderId());
+    public PaymentResponse createPayment(@RequestBody CreatePaymentRequest request) {
+        log.info("[Payment] 결제 생성 orderId={}", request.orderId());
 
-        String redirectUrl = paymentService.getPspRedirectionUrl(request.orderId());
-        return "redirect:"+redirectUrl;
+        return paymentService.createPayment(request.orderId());
     }
 
     @PostMapping("/confirm")
