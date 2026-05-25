@@ -79,9 +79,11 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
+        // 결제 승인 처리 시작. 상태 등록
+        payment.start(confirmRequest.paymentKey());
+
         try {
             // 검증
-            payment.start();
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
             // toss 결제 승인 요청
@@ -108,7 +110,7 @@ public class PaymentService {
 
             // TODO : 만약 재고가 감소된 상태라면, 재고 복구 처리 (재고 감소가 마지막이므로 로직상 문제가 없다면, 재고 감소가 실패한 경우는 없을 것이다.)
 
-            log.warn("[Payment] 결제 실패. paymentKey={}, orderId={}, amount={}",
+            log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
             throw new PaymentConfirmExternalException(confirmRequest.paymentId(),
                 confirmRequest.paymentKey(), exception);

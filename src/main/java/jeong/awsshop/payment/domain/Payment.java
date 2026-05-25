@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import jeong.awsshop.payment.exception.PaymentAmountMismatchException;
 import jeong.awsshop.payment.exception.PaymentInvalidAmountException;
+import jeong.awsshop.payment.exception.PaymentInvalidPaymentKey;
 import jeong.awsshop.payment.exception.PaymentInvalidStatusException;
 import jeong.awsshop.payment.exception.PaymentOrderIdMismatchException;
 import lombok.AccessLevel;
@@ -31,6 +32,9 @@ public class Payment {
     // 결제할 주문 정보
     private Long orderId;
 
+    // toss 결제 고유 키 (결제 승인 요청, 환불, 취소 시 필요)
+    private String paymentKey;
+
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
 
@@ -38,12 +42,24 @@ public class Payment {
     @Column(precision = 13, scale = 4, nullable = false)
     private BigDecimal amount;
 
-    /** 결제 시작 처리 */
-    public void start() {
+    /** 결제 시작 처리
+     * 처리 : 상태 변경 및 결제 고유 키 등록
+     * 호출 시점 : 결제 승인 요청 시, Toss 측에서 발급한 paymentKey를 Frontend에서 받아서 등록한다.
+     * */
+    public void start(String paymentKey) {
         if (this.status != PaymentStatus.NOT_STARTED) {
             throw new PaymentInvalidStatusException(PaymentStatus.NOT_STARTED, this.status);
         }
         this.status = PaymentStatus.EXECUTING;
+
+        registerPaymentKey(paymentKey);
+    }
+
+    private void registerPaymentKey(String paymentKey) {
+        if (paymentKey == null || paymentKey.isBlank()) {
+            throw new PaymentInvalidPaymentKey(paymentKey);
+        }
+        this.paymentKey = paymentKey;
     }
 
     /** 주문 id 동일 검증 */
