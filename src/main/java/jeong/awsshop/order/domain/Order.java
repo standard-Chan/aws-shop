@@ -1,5 +1,6 @@
 package jeong.awsshop.order.domain;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -9,31 +10,44 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "orders") // "order"는 SQL에서 예약어이므로, 테이블 이름을 "orders"로 변경
+@Table(name = "orders")
+@Builder
+@AllArgsConstructor
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    private Long id;
 
-    // 주문 상태 (NOT_STARTED, PROCESSING, COMPLETED, CANCELED)
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private OrderStatus status;
 
-    // 주문 총 비용
+    @Column(nullable = false)
+    private Long userId;
+
+    @Column(precision = 13, scale = 4, nullable = false)
     private BigDecimal totalAmount;
 
-    // 주문 품목 (FK)
+    @Column(nullable = false)
+    private String shippingAddress;
 
+    public static Order createTemporary(Long userId) {
+        long resolvedUserId = userId == null ? 1L : userId;
 
-    // 구매자 정보 (FK)
-
-
-    // 배송지 정보
-    private String address;
+        return Order.builder()
+            .userId(resolvedUserId)
+            .status(OrderStatus.NOT_STARTED)
+            .totalAmount(new BigDecimal("129.99"))
+            .shippingAddress("Seoul Songpa-gu Olympic-ro 300")
+            .build();
+    }
 }
