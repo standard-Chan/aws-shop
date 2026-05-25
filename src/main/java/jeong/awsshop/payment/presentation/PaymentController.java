@@ -1,7 +1,7 @@
 package jeong.awsshop.payment.presentation;
 
 import jeong.awsshop.payment.application.PaymentService;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
@@ -20,23 +20,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentService paymentService;
-    private final TossPaymentClient tossPaymentClient;
+    private final PaymentRepository paymentRepository;
 
     @PostMapping()
     public PaymentResponse createPayment(@RequestBody CreatePaymentRequest request) {
-        log.info("[Payment] 결제 생성 orderId={}", request.orderId());
-
-        return paymentService.createPayment(request.orderId());
+        return paymentService.createPayment(request);
     }
 
     @PostMapping("/confirm")
-    public TossPaymentConfirmResponse confirmPayment(@RequestBody TossPaymentConfirmRequest request) {
-        log.info("[Payment] 결제 승인 요청");
-        TossPaymentConfirmResponse response =  tossPaymentClient.confirm(request);
-        log.info("[Payment] 결제 승인 완료. paymentKey={}, orderId={}, amount={}",
-            response.paymentKey(), response.orderId(), response.totalAmount());
-
-        return response;
+    public TossPaymentConfirmResponse confirmPayment(
+        @RequestBody TossPaymentConfirmRequest request) {
+        return paymentService.confirmPayment(request);
     }
 
 }
