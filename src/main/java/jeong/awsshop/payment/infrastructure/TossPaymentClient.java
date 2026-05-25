@@ -2,6 +2,7 @@ package jeong.awsshop.payment.infrastructure;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import jeong.awsshop.payment.exception.PaymentTossPaymentProcessingException;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -28,22 +29,26 @@ public class TossPaymentClient {
     * Toss Payments 서버로부터 결제 정보를 받아온다.
     */
     public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
-        String encodedSecretKey = Base64.getEncoder()
-            .encodeToString(
-                (secretKey + ":")
-                    .getBytes(StandardCharsets.UTF_8)
-            );
+        try {
+            String encodedSecretKey = Base64.getEncoder()
+                .encodeToString(
+                    (secretKey + ":")
+                        .getBytes(StandardCharsets.UTF_8)
+                );
 
-        return tossPaymentClient.post()
-            .uri("https://api.tosspayments.com/v1/payments/confirm")
-            .header(
-                HttpHeaders.AUTHORIZATION,
-                "Basic " + encodedSecretKey
-            )
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(request)
-            .retrieve()
-            .body(TossPaymentConfirmResponse.class);
+            return tossPaymentClient.post()
+                .uri("https://api.tosspayments.com/v1/payments/confirm")
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    "Basic " + encodedSecretKey
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(TossPaymentConfirmResponse.class);
+        } catch (Exception e) {
+            throw new PaymentTossPaymentProcessingException(request.paymentId(), request.paymentKey(), e.getMessage(), e);
+        }
     }
 
 }
