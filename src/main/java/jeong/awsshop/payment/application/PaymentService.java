@@ -13,12 +13,12 @@ import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
+import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -58,7 +58,7 @@ public class PaymentService {
         Payment savedPayment = paymentRepository.save(payment);
 
         // 응답 생성
-        PaymentResponse response = new PaymentResponse(savedPayment.getId(),
+        PaymentResponse response = new PaymentResponse(String.valueOf(savedPayment.getId()),
             savedPayment.getOrderId(),
             savedPayment.getStatus(), savedPayment.getAmount());
 
@@ -68,10 +68,10 @@ public class PaymentService {
     }
 
     /**
-     * 결제 승인 요청을 처리한다.
+     * 결제 승인 요청을 처리한다. - @Transactional : 결제 승인 처리 과정에서 예외가 발생할 경우, 값의 변경이 초기화 되면 안되므로 적용하지 않았습니다. -
+     * 다음 값이 초기화되면 안되는 값에 해당합니다. - paymentKey 등록 - status로 변경 (결제 진행 시 : EXECUTING , 실패 시 : FAILD)
      */
-    @Transactional
-    public TossPaymentConfirmResponse confirmPayment(TossPaymentConfirmRequest confirmRequest) {
+    public TossPaymentConfirmResponse confirmPayment(ConfirmPaymentRequest confirmRequest) {
         log.info("[Payment] 결제 승인 요청, 결제 정보 : 결제 id={}, 주문 id={}, 결제 금액={}",
             confirmRequest.paymentKey(),
             confirmRequest.orderId(), confirmRequest.amount());
@@ -86,13 +86,20 @@ public class PaymentService {
             // 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
+
+            // TODO : 주문 상태 검증
+            // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
+            // (실제 서비스에서는 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오지 않도록 프론트엔드에서 막는 것이 좋다.)
+
             // toss 결제 승인 요청
-            TossPaymentConfirmResponse response = tossPaymentClient.confirm(confirmRequest);
+            TossPaymentConfirmResponse response = tossPaymentClient.confirm(
+                new TossPaymentConfirmRequest(confirmRequest.paymentId(),
+                    confirmRequest.paymentKey(), confirmRequest.amount()));
 
             // 결제 승인 완료
             payment.complete();
 
-            log.info("[Payment] 결제 승인 완료. paymentKey={}, orderId={}, amount={}",
+            log.info("[Payment] 결제 승인 완료. paymentKey={}, paymentId={}, amount={}",
                 response.paymentKey(), response.orderId(), response.totalAmount());
 
             // Order 완료 처리
@@ -100,10 +107,12 @@ public class PaymentService {
 
             // TODO : 재고 감소 처리
 
+            paymentRepository.save(payment);
             return response;
         } catch (PaymentException exception) {
             // 해당 결제 실패 처리
             payment.fail();
+            paymentRepository.save(payment);
 
             // Order 상태 pending 변경
             orderClient.updatePendingOrder(payment.getOrderId());
