@@ -2,6 +2,10 @@ package jeong.awsshop.order.application;
 
 import jeong.awsshop.order.domain.Order;
 import jeong.awsshop.order.domain.OrderRepository;
+import jeong.awsshop.order.domain.OrderStatus;
+import jeong.awsshop.order.exception.OrderAlreadyCompletedException;
+import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
+import jeong.awsshop.order.exception.OrderNotFoundException;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -46,11 +50,29 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public OrderSummaryResponse getOrder(Long id) {
-        Order order = orderRepository.findById(id)
-            .orElseThrow(
-                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+        Order order = getOrderEntity(id);
 
         return OrderSummaryResponse.from(order);
+    }
+
+    /**
+     * 주문을 executing 상태로 전환
+     */
+    @Transactional
+    public OrderSummaryResponse executingOrder(Long id) {
+        int updatedCount = orderRepository.updateStatusToExecutingIfAvailable(id);
+        if (updatedCount == 1) {
+            return OrderSummaryResponse.from(getOrderEntity(id));
+        }
+
+        Order order = getOrderEntity(id);
+        if (order.getStatus() == OrderStatus.EXECUTING) {
+            throw new OrderAlreadyExecutingException(id);
+        }
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new OrderAlreadyCompletedException(id);
+        }
+        throw new IllegalStateException("[Order] Failed to update order to EXECUTING. id=" + id);
     }
 
     /**
@@ -58,9 +80,7 @@ public class OrderService {
      */
     @Transactional
     public OrderSummaryResponse pendingOrder(Long id) {
-        Order order = orderRepository.findById(id)
-            .orElseThrow(
-                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+        Order order = getOrderEntity(id);
 
         order.pending();
         return OrderSummaryResponse.from(order);
@@ -71,9 +91,7 @@ public class OrderService {
      */
     @Transactional
     public OrderSummaryResponse completeOrder(Long id) {
-        Order order = orderRepository.findById(id)
-            .orElseThrow(
-                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+        Order order = getOrderEntity(id);
 
         order.complete();
         return OrderSummaryResponse.from(order);
@@ -84,12 +102,15 @@ public class OrderService {
      */
     @Transactional
     public OrderSummaryResponse cancelOrder(Long id) {
-        Order order = orderRepository.findById(id)
-            .orElseThrow(
-                () -> new IllegalArgumentException("[Order] Order not found with id: " + id));
+        Order order = getOrderEntity(id);
 
         order.cancel();
         return OrderSummaryResponse.from(order);
+    }
+
+    private Order getOrderEntity(Long id) {
+        return orderRepository.findById(id)
+            .orElseThrow(() -> new OrderNotFoundException(id));
     }
 
 }
