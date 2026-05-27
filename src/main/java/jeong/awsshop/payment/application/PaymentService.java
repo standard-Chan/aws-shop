@@ -6,8 +6,10 @@ import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
+import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
+import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
@@ -47,11 +49,12 @@ public class PaymentService {
      * 1) Order 상태를 통해 결제 생성 진입을 점유한다.
      * 2) 이미 처리 중인 상태라면, 기존 Payment를 조회해 만료 여부를 판단한다.
      * 3) 만료되지 않았다면 기존 Payment를 반환한다.
-     * 4) 만료되었거나 처리 중 Payment가 없으면 장애 복구 후 새 Payment를 생성한다.
+     * 4) 만료되었으면 만료 응답을 반환한다.
+     * 5) 처리 중 Payment가 없으면 장애 복구 후 에러를 반환한다.
      *
      * 의도:
-     * order 상태를 진입 제어 신호로 사용하되, 실제 재사용/재생성 판단은 payment 저장소의 활성 결제를 기준으로 수행한다.
-     * 즉, order 가 EXECUTING 이라는 사실만으로 중복 결제라고 단정하지 않고, payment 데이터와 함께 복구 가능 여부를 판단한다.
+     * Payment 생성은 updateExecutingStatus 성공 경로에서만 수행한다.
+     * order 가 EXECUTING 이라는 사실만으로 중복 결제라고 단정하지 않고, payment 데이터와 함께 재사용/만료/복구 필요 여부를 판단한다.
      *
      * @param request
      * @return psp 결제 URL
@@ -64,18 +67,20 @@ public class PaymentService {
         OrderSummary order;
         try {
             order = orderClient.updateExecutingStatus(request.orderId());
-        } catch (PaymentOrderAlreadyExecutingException exception) {
+        }
+        // 이미 Payment 가 존재 하는 경우
+        catch (PaymentOrderAlreadyExecutingException exception) {
             return recoverOrReuseExistingPayment(request.orderId());
         } catch (RuntimeException exception) {
             throw new PaymentOrderLookupException(request.orderId(), exception);
         }
 
         log.info("[Payment] 주문 상태 EXECUTING 갱신 완료 = {}", order.orderId());
-        return createNewPayment(order, "INITIAL_CREATE");
+        return createNewPayment(order);
     }
 
     /**
-     * order 가 이미 EXECUTING 인 경우, 기존 활성 결제를 재사용할지 새로 생성할지 결정한다.
+     * order 가 이미 EXECUTING 인 경우, 기존 활성 결제를 재사용할지 만료/복구 예외를 반환할지 결정한다.
      *
      * 용어:
      * active payment 는 결제 진행 중이거나 결제 시작 전인 상태의 결제를 의미한다. (NOT_STARTED, EXECUTING)
@@ -91,38 +96,34 @@ public class PaymentService {
 
         Payment activePayment = activePayments.isEmpty() ? null : activePayments.get(0);
 
-        // 기존 결제가 존재하고, 만료되지 않았다면 재사용
+        // 결제가 존재하고, 만료되지 않았다면 그대로 반환한다.
         if (activePayment != null && !activePayment.isExpired(LocalDateTime.now())) {
             log.info("[Payment] 존재하는 결제 재사용 orderId={}, paymentId={}, status={}",
                 orderId, activePayment.getId(), activePayment.getStatus());
             return PaymentResponse.from(activePayment);
         }
 
-        // 기존 결제가 존재하지만 만료된 경우, 새 결제 생성
+        // 결제가 존재하지만 만료된 경우, 만료 처리 후 예외를 반환한다.
         if (activePayment != null) {
             activePayment.expire();
             paymentRepository.save(activePayment);
             log.warn("[Payment] 만료된 결제 감지 orderId={}, paymentId={}", orderId, activePayment.getId());
-            OrderSummary recoveredOrder = orderClient.getOrder(orderId);
-            return createNewPayment(recoveredOrder, "EXPIRED_RECREATE");
+            throw new PaymentExpiredException(orderId, activePayment.getId());
         }
-        // 기존 결제가 존재하지 않는 경우, 강제 복구 시도
-        else {
-            log.error("[Payment] order 는 EXECUTING 이지만 활성 Payment 가 없습니다. 강제 복구를 시도합니다. orderId={}",
-                orderId);
-            OrderSummary recoveredOrder = orderClient.getOrder(orderId);
-            return createNewPayment(recoveredOrder, "RECOVERY_RECREATE");
-        }
+
+        log.error("[Payment] order 는 EXECUTING 이지만 활성 Payment 가 없습니다. 강제 복구를 시도합니다. orderId={}",
+            orderId);
+        orderClient.updatePendingOrder(orderId);
+        throw new PaymentRecoveryRequiredException(orderId);
     }
 
     /**
      * 주문 정보 기준으로 새 결제를 생성한다.
      *
      * 의도:
-     * 신규 생성과 복구 후 재생성을 같은 규칙으로 묶기 위해 생성 로직을 한곳에 둔다.
-     * 생성 시각과 만료 시각을 함께 기록해서 이후 재진입 시 만료 판단 근거로 사용한다.
+     * 결제 생성 규칙을 한곳에 두고, 생성 시각과 만료 시각을 함께 기록한다.
      */
-    private PaymentResponse createNewPayment(OrderSummary order, String creationReason) {
+    private PaymentResponse createNewPayment(OrderSummary order) {
         LocalDateTime createdAt = LocalDateTime.now();
         Payment payment = Payment.builder()
             .id(snowflakeIdGenerator.nextId())
@@ -133,8 +134,8 @@ public class PaymentService {
             .expiresAt(createdAt.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
             .build();
 
-        log.info("[Payment] 결제 객체 생성 orderId={}, paymentId={}, reason={}",
-            payment.getOrderId(), payment.getId(), creationReason);
+        log.info("[Payment] 결제 객체 생성 orderId={}, paymentId={}",
+            payment.getOrderId(), payment.getId());
 
         Payment savedPayment = paymentRepository.save(payment);
 

@@ -1,8 +1,9 @@
 package jeong.awsshop.payment.presentation;
 
 import jeong.awsshop.payment.application.PaymentService;
-import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.exception.DuplicatePaymentException;
+import jeong.awsshop.payment.exception.PaymentExpiredException;
+import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
@@ -39,6 +40,18 @@ public class PaymentController {
     @ResponseStatus(HttpStatus.CONFLICT)
     @ExceptionHandler(DuplicatePaymentException.class)
     public String handleDuplicatePayment(DuplicatePaymentException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.GONE)
+    @ExceptionHandler(PaymentExpiredException.class)
+    public String handleExpiredPayment(PaymentExpiredException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ExceptionHandler(PaymentRecoveryRequiredException.class)
+    public String handlePaymentRecoveryRequired(PaymentRecoveryRequiredException ex) {
         return ex.getMessage();
     }
 }
