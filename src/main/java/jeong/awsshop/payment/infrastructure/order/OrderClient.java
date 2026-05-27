@@ -1,10 +1,13 @@
 package jeong.awsshop.payment.infrastructure.order;
 
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 @RequiredArgsConstructor
@@ -20,6 +23,32 @@ public class OrderClient {
             .uri("/api/orders/{orderId}", orderId)
             .retrieve()
             .body(OrderSummary.class);
+
+        if (response == null) {
+            throw new PaymentOrderLookupException(orderId);
+        }
+
+        return response;
+    }
+
+    /**
+     * order server로 부터 order 상태를 EXECUTING으로 갱신 한다
+     * 사용 시기 : 해당 order의 status != EXECUTING 인 경우에만 성공을 반환하고
+     * EXECUTING인 경우, 이미 결제 처리중인 Payment가 있다고 판단할 것.
+     */
+    public OrderSummary updateExecutingStatus(Long orderId) {
+        OrderSummary response;
+        try {
+            response = orderRestClient.post()
+                .uri("/api/orders/{orderId}/executing", orderId)
+                .retrieve()
+                .body(OrderSummary.class);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode() == HttpStatus.CONFLICT) {
+                throw new PaymentOrderAlreadyExecutingException(orderId, exception);
+            }
+            throw new PaymentOrderLookupException(orderId, exception);
+        }
 
         if (response == null) {
             throw new PaymentOrderLookupException(orderId);
