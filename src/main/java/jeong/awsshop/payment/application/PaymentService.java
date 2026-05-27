@@ -4,6 +4,7 @@ import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
@@ -18,6 +19,7 @@ import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,8 +37,9 @@ public class PaymentService {
      *
      * @param request
      * @return psp 결제 URL
+     *
+     * // @Transactional : order server에 요청을 보내므로, 트랜잭션을 처리하지 않았습니다. DB 커넥션을 잡지 않기 위함입니다.
      */
-    // TODO : 현재는 사용자가 이를 호출하지만, 실제로는 주문이 생성될 때 주문 서비스에서 이를 호출하는 형태가 되어야한다.
     public PaymentResponse createPayment(CreatePaymentRequest request) {
         log.info("[Payment] 결제 생성 orderId={}", request.orderId());
 
@@ -44,9 +47,11 @@ public class PaymentService {
         try {
             // 주문 정보 조회
             order = orderClient.getOrder(request.orderId());
+            log.info("[Payment] 주문 정보 조회 완료 = {}", order.orderId());
         } catch (RuntimeException exception) {
             throw new PaymentOrderLookupException(request.orderId(), exception);
         }
+
 
         // 결제 Entity 생성
         Payment payment = Payment.builder()
@@ -55,16 +60,24 @@ public class PaymentService {
             .amount(order.totalAmount())
             .status(PaymentStatus.NOT_STARTED)
             .build();
-        Payment savedPayment = paymentRepository.save(payment);
 
-        // 응답 생성
-        PaymentResponse response = new PaymentResponse(String.valueOf(savedPayment.getId()),
-            savedPayment.getOrderId(),
-            savedPayment.getStatus(), savedPayment.getAmount());
+        log.info("[Payment] 결제 객체 생성 orderId={}", payment.getId());
 
-        log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), savedPayment.getId());
+        try {
+            Payment savedPayment = paymentRepository.save(payment);
+            // 응답 생성
+            PaymentResponse response = new PaymentResponse(String.valueOf(savedPayment.getId()),
+                savedPayment.getOrderId(),
+                savedPayment.getStatus(), savedPayment.getAmount());
 
-        return response;
+            log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), savedPayment.getId());
+
+            return response;
+        } catch (DataIntegrityViolationException e) {
+            // UNIQUE 제약조건 위반 등 데이터 무결성 오류 발생 시 커스텀 예외로 전환
+            log.warn("[Payment] 결제 Entity 중복 생성 orderId={}", payment.getOrderId());
+            throw new DuplicatePaymentException(request.orderId());
+        }
     }
 
     /**
