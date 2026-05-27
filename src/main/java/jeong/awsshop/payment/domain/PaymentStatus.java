@@ -5,5 +5,6 @@ public enum PaymentStatus {
     NOT_STARTED, // 결제 시작 전
     EXECUTING, // 결제 진행 중
     SUCCESS, // 결제 성공
+    EXPIRED, // 결제 만료
     FAILED // 결제 실패
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import jeong.awsshop.payment.exception.PaymentAmountMismatchException;
 import jeong.awsshop.payment.exception.PaymentInvalidAmountException;
 import jeong.awsshop.payment.exception.PaymentInvalidPaymentKey;
@@ -35,10 +36,11 @@ public class Payment {
     // toss 결제 고유 키 (결제 승인 요청, 환불, 취소 시 필요)
     private String paymentKey;
 
-    // TODO:
-    // createPayment 재진입 플로우에서 "만료된 처리 중 결제"를 판단하려면 시간 기준이 필요하다.
-    // startedAt / expiresAt 중 하나을 추가한다.
-    // 이후 만료 필드를 바탕으로, 도메인에서 만료 여부를 검사한다.
+    private LocalDateTime createdAt;
+
+    private LocalDateTime expiresAt;
+
+    private LocalDateTime completedAt;
 
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
@@ -99,6 +101,7 @@ public class Payment {
             throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status);
         }
         this.status = PaymentStatus.SUCCESS;
+        this.completedAt = LocalDateTime.now();
     }
 
     /** 결제 실패 처리 */
@@ -109,5 +112,21 @@ public class Payment {
             throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status, "결제 실패 처리 중 상태 예외가 발생하였습니다.");
         }
         this.status = PaymentStatus.FAILED;
+    }
+
+    public boolean isActive() {
+        return this.status == PaymentStatus.NOT_STARTED || this.status == PaymentStatus.EXECUTING;
+    }
+
+    public boolean isExpired(LocalDateTime currentTime) {
+        return this.expiresAt != null && !this.expiresAt.isAfter(currentTime);
+    }
+
+    public void expire() {
+        if (!isActive()) {
+            throw new PaymentInvalidStatusException(PaymentStatus.NOT_STARTED, this.status,
+                "결제 만료 처리 중 상태 예외가 발생하였습니다.");
+        }
+        this.status = PaymentStatus.EXPIRED;
     }
 }
