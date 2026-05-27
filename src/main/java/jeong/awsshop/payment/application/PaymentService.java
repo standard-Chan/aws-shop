@@ -35,6 +35,11 @@ public class PaymentService {
 
     /**
      * 주문 id에 해당하는 결제를 생성하여 반환한다.
+     * 목표 플로우:
+     * 1) Order 상태를 통해 결제 생성 진입을 점유한다.
+     * 2) 이미 처리 중인 상태라면, 기존 Payment를 조회해 만료 여부를 판단한다.
+     * 3) 만료되지 않았다면 기존 Payment를 반환한다.
+     * 4) 만료되었거나 처리 중 Payment가 없으면 장애 복구 후 새 Payment를 생성한다.
      *
      * @param request
      * @return psp 결제 URL
@@ -46,10 +51,19 @@ public class PaymentService {
 
         OrderSummary order;
         try {
-            // 주문 상태를 EXECUTING 으로 전환하며 결제 생성 진입을 점유한다.
+            // 1. 주문 상태를 EXECUTING 으로 전환하며 결제 생성 진입을 점유한다.
+            // 정상적으로 점유되면 현재 order 기준 처리 중 Payment가 없다고 간주하고 새 Payment를 생성한다.
             order = orderClient.updateExecutingStatus(request.orderId());
             log.info("[Payment] 주문 상태 EXECUTING 갱신 완료 = {}", order.orderId());
         } catch (PaymentOrderAlreadyExecutingException exception) {
+            // TODO:
+            // 2. order 가 이미 EXECUTING 이라면 바로 중복 예외로 끝내지 말고, (NOT_STARTED, EXECUTING) 상태의 Payment 를 다시 조회해야 한다.
+            // 3. 해당 Payment 가 존재하면 만료 여부를 판단한다. 만료 여부는 Payment의 expiredAt 필드와 현재시각을 비교해서 확인한다.
+            // 현재는 expiredAt 필드가 없으므로, expiredAt 필드를 Entity에 추가하여 처리한다.
+            // 4. 만료되지 않았으면 기존 Payment 를 그대로 반환한다.
+            // 5. 만료되었으면 order/payment 상태를 복구한 뒤 새 Payment 를 생성한다.
+            // 6. 처리 중 Payment 가 없으면 장애 상황으로 보고 로그를 남기고, 강제 복구 이후 새 Payment 를 생성한다.
+            // 7. Order는 이미 EXECUTING 상태이므로, 그대로 EXECUTING으로 유지해두고, Payment 를 새롭게 생성한다.
             Payment executingPayment = paymentRepository.findByOrderIdAndStatus(request.orderId(), PaymentStatus.EXECUTING)
                 .orElseThrow(() -> new DuplicatePaymentException(request.orderId()));
 
@@ -67,7 +81,11 @@ public class PaymentService {
         }
 
 
+        // TODO:
+        // 만료된 기존 Payment 의 재생성인지, 최초 생성인지 로그/메트릭으로 구분할 수 있게 생성 사유를 남긴다.
+        // 만료 판단 기준이 들어오면 Payment 생성 전에 복구 단계와 함께 묶어서 기록한다.
         // 결제 Entity 생성
+        // 만료 필드를 추가한 뒤, expiredAt 필드와 현재 시각을 비교하여 만료 여부를 판단한다. (5분으로 설정)
         Payment payment = Payment.builder()
             .id(snowflakeIdGenerator.nextId())
             .orderId(request.orderId())

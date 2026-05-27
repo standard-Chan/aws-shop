@@ -35,6 +35,9 @@ public class OrderClient {
      * order server로 부터 order 상태를 EXECUTING으로 갱신 한다
      * 사용 시기 : 해당 order의 status != EXECUTING 인 경우에만 성공을 반환하고
      * EXECUTING인 경우, 이미 결제 처리중인 Payment가 있다고 판단할 것.
+     * TODO:
+     * CONFLICT 는 즉시 실패 신호가 아니라 "로컬 Payment 상태를 다시 확인하라"는 신호로 사용될 예정이다.
+     * 따라서 application service 에서 CONFLICT 이후 복구 분기가 추가되면 이 메서드의 계약도 같이 문서화해야 한다.
      */
     public OrderSummary updateExecutingStatus(Long orderId) {
         OrderSummary response;

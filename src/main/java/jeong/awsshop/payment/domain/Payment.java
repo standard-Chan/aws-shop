@@ -35,6 +35,11 @@ public class Payment {
     // toss 결제 고유 키 (결제 승인 요청, 환불, 취소 시 필요)
     private String paymentKey;
 
+    // TODO:
+    // createPayment 재진입 플로우에서 "만료된 처리 중 결제"를 판단하려면 시간 기준이 필요하다.
+    // startedAt / expiresAt 중 하나을 추가한다.
+    // 이후 만료 필드를 바탕으로, 도메인에서 만료 여부를 검사한다.
+
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
 
