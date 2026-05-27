@@ -11,6 +11,9 @@ import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
@@ -71,6 +74,10 @@ public class PaymentService {
         // 이미 Payment 가 존재 하는 경우
         catch (PaymentOrderAlreadyExecutingException exception) {
             return recoverOrReuseExistingPayment(request.orderId());
+        } catch (PaymentOrderAlreadyCompletedException
+                 | PaymentOrderAlreadyCanceledException
+                 | PaymentOrderExpiredException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             throw new PaymentOrderLookupException(request.orderId(), exception);
         }

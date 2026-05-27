@@ -3,8 +3,10 @@ package jeong.awsshop.order.application;
 import jeong.awsshop.order.domain.Order;
 import jeong.awsshop.order.domain.OrderRepository;
 import jeong.awsshop.order.domain.OrderStatus;
+import jeong.awsshop.order.exception.OrderAlreadyCanceledException;
 import jeong.awsshop.order.exception.OrderAlreadyCompletedException;
 import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
+import jeong.awsshop.order.exception.OrderExpiredException;
 import jeong.awsshop.order.exception.OrderNotFoundException;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +73,12 @@ public class OrderService {
         }
         if (order.getStatus() == OrderStatus.COMPLETED) {
             throw new OrderAlreadyCompletedException(id);
+        }
+        if (order.getStatus() == OrderStatus.CANCELED) {
+            throw new OrderAlreadyCanceledException(id);
+        }
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            throw new OrderExpiredException(id);
         }
         throw new IllegalStateException("[Order] Failed to update order to EXECUTING. id=" + id);
     }

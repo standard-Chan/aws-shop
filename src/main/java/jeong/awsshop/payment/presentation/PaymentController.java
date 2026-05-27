@@ -4,6 +4,9 @@ import jeong.awsshop.payment.application.PaymentService;
 import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
@@ -52,6 +55,24 @@ public class PaymentController {
     @ResponseStatus(HttpStatus.CONFLICT)
     @ExceptionHandler(PaymentRecoveryRequiredException.class)
     public String handlePaymentRecoveryRequired(PaymentRecoveryRequiredException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ExceptionHandler(PaymentOrderAlreadyCompletedException.class)
+    public String handleCompletedOrder(PaymentOrderAlreadyCompletedException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ExceptionHandler(PaymentOrderAlreadyCanceledException.class)
+    public String handleCanceledOrder(PaymentOrderAlreadyCanceledException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.GONE)
+    @ExceptionHandler(PaymentOrderExpiredException.class)
+    public String handleExpiredOrder(PaymentOrderExpiredException ex) {
         return ex.getMessage();
     }
 }

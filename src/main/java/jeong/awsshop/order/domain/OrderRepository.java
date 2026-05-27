@@ -13,6 +13,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         SET status = 'EXECUTING'
         WHERE id = :id
             AND status <> 'COMPLETED'
+            AND status <> 'CANCELED'
+            AND status <> 'EXPIRED'
             AND status <> 'EXECUTING'
         """, nativeQuery = true)
     int updateStatusToExecutingIfAvailable(@Param("id") Long id);

@@ -1,17 +1,23 @@
 package jeong.awsshop.payment.infrastructure.order;
 
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
 @RequiredArgsConstructor
 public class OrderClient {
+
+    private static final String ORDER_STATUS_HEADER = "X-Order-Status";
 
     private final RestClient orderRestClient;
 
@@ -48,7 +54,23 @@ public class OrderClient {
                 .body(OrderSummary.class);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode() == HttpStatus.CONFLICT) {
-                throw new PaymentOrderAlreadyExecutingException(orderId, exception);
+                String orderStatus = resolveOrderStatusHeader(exception);
+                if ("EXECUTING".equals(orderStatus)) {
+                    throw new PaymentOrderAlreadyExecutingException(orderId, exception);
+                }
+                if ("COMPLETED".equals(orderStatus)) {
+                    throw new PaymentOrderAlreadyCompletedException(orderId, exception);
+                }
+                if ("CANCELED".equals(orderStatus)) {
+                    throw new PaymentOrderAlreadyCanceledException(orderId, exception);
+                }
+                throw new PaymentOrderLookupException(orderId, exception);
+            }
+            if (exception.getStatusCode() == HttpStatus.GONE) {
+                if ("EXPIRED".equals(resolveOrderStatusHeader(exception))) {
+                    throw new PaymentOrderExpiredException(orderId, exception);
+                }
+                throw new PaymentOrderLookupException(orderId, exception);
             }
             throw new PaymentOrderLookupException(orderId, exception);
         }
@@ -58,6 +80,14 @@ public class OrderClient {
         }
 
         return response;
+    }
+
+    private String resolveOrderStatusHeader(RestClientResponseException exception) {
+        HttpHeaders headers = exception.getResponseHeaders();
+        if (headers == null) {
+            return null;
+        }
+        return headers.getFirst(ORDER_STATUS_HEADER);
     }
 
     /**
