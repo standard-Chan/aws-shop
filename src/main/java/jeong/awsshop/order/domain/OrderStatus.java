@@ -5,5 +5,6 @@ public enum OrderStatus {
     EXECUTING, // 주문 처리 중
     PENDING, // 결제 처리 실패 후 후속 처리를 대기 중인 상태
     COMPLETED,    // 주문 완료
-    CANCELED  // 주문 취소
+    CANCELED,  // 주문 취소
+    EXPIRED // 주문 만료
 }
