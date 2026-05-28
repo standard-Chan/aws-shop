@@ -1,0 +1,44 @@
+### 리뷰 기본 조회 - helpfulVote 기본 정렬(desc)
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=20
+Accept: application/json
+
+### 리뷰 조회 - helpfulVote 정렬(desc)
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=10&sort=helpfulVote&direction=desc
+Accept: application/json
+
+### 리뷰 조회 - helpfulVote cursor 기반 다음 페이지
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=20&sort=helpfulVote&direction=desc&cursorId=20001&cursorTimestamp=1653846936825&cursorHelpfulVote=11
+Accept: application/json
+
+### 리뷰 조회 - rating 정렬(asc)
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=20&sort=rating&direction=asc
+Accept: application/json
+
+### 리뷰 조회 - rating cursor 기반 다음 페이지(asc)
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=20&sort=rating&direction=asc&cursorId=20001&cursorTimestamp=1653846936825&cursorRating=5.0
+Accept: application/json
+
+### 리뷰 조회 - 다른 상품
+
+GET http://localhost:8080/api/reviews/products/B09GK2JJDZ?size=20
+Accept: application/json
+
+### 리뷰 조회 - 결과 없음
+
+GET http://localhost:8080/api/reviews/products/NO_SUCH_PARENT_ASIN?size=20
+Accept: application/json
+
+### 리뷰 조회 - 잘못된 size
+
+GET http://localhost:8080/api/reviews/products/B096MTTDJL?size=0
+Accept: application/json
+
+### 리뷰 조회 - 잘못된 cursor 조합
+
+GET http://localhost:8080/api/reviews/products/B096MTTDJL?cursorId=20001
+Accept: application/json

@@ -1,0 +1,18 @@
+### order 생성
+POST http://localhost:8080/api/orders
+Content-Type: application/json
+
+### order id 로 조회
+GET http://localhost:8080/api/orders/2
+
+### order executing 상태 갱신
+POST http://localhost:8080/api/orders/2/executing
+
+### order pending 상태 갱신
+POST http://localhost:8080/api/orders/2/pending
+
+### order 성공 상태 갱신
+POST http://localhost:8080/api/orders/2/success
+
+### order 실패 상태 갱신
+POST http://localhost:8080/api/orders/2/fail

@@ -1,0 +1,19 @@
+### payment 생성 및 반환
+POST localhost:8080/api/payments
+Content-Type: application/json
+
+{
+  "orderId": 3
+}
+
+### 결제 승인 요청
+POST localhost:8080/api/payments/confirm
+Content-Type: application/json
+Authorization: dGVzdF9za19vRWpiMGdtMjNQd1h2dm1YNWVZbzhwR3dCSm41Og==
+
+{
+  "paymentId": 334306844300283904,
+  "paymentKey": "7",
+  "orderId": 3,
+  "amount": 129.9900
+}
