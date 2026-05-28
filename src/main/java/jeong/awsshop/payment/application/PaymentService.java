@@ -4,6 +4,7 @@ import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
@@ -19,6 +20,7 @@ import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -72,6 +74,47 @@ public class PaymentService {
         log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), payment.getId());
 
         return response;
+    }
+
+    /** 락 없는 일반적인 INSERT 버전 함수 (물론 insert 시에 자연스럽게 발생하는 X-Lock은 존재*/
+    public PaymentResponse createPaymentWithNoLock(CreatePaymentRequest request) {
+        log.info("[Payment] 결제 생성 orderId={}", request.orderId());
+
+        OrderSummary order;
+        try {
+            // 주문 정보 조회
+            order = orderClient.getOrder(request.orderId());
+            log.info("[Payment] 주문 정보 조회 완료 = {}", order.orderId());
+        } catch (RuntimeException exception) {
+            throw new PaymentOrderLookupException(request.orderId(), exception);
+        }
+
+
+        // 결제 Entity 생성
+        Payment payment = Payment.builder()
+            .id(snowflakeIdGenerator.nextId())
+            .orderId(request.orderId())
+            .amount(order.totalAmount())
+            .status(PaymentStatus.NOT_STARTED)
+            .build();
+
+        log.info("[Payment] 결제 객체 생성 paymentId={}, orderId={}", payment.getId(), payment.getOrderId());
+
+        try {
+            Payment savedPayment = paymentRepository.save(payment);
+            // 응답 생성
+            PaymentResponse response = new PaymentResponse(String.valueOf(savedPayment.getId()),
+                savedPayment.getOrderId(),
+                savedPayment.getStatus(), savedPayment.getAmount());
+
+            log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), savedPayment.getId());
+
+            return response;
+        } catch (DataIntegrityViolationException e) {
+            // UNIQUE 제약조건 위반 등 데이터 무결성 오류 발생 시 커스텀 예외로 전환
+            log.warn("[Payment] 결제 Entity 중복 생성 orderId={}", payment.getOrderId());
+            throw new DuplicatePaymentException(request.orderId(), e);
+        }
     }
 
     /**
