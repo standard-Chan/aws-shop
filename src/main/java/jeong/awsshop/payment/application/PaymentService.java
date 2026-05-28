@@ -4,7 +4,6 @@ import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
@@ -20,7 +19,6 @@ import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,6 +28,7 @@ public class PaymentService {
 
     private final OrderClient orderClient;
     private final PaymentRepository paymentRepository;
+    private final PaymentCreateWriter paymentCreateWriter;
     private final TossPaymentClient tossPaymentClient;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
@@ -64,21 +63,15 @@ public class PaymentService {
 
         log.info("[Payment] 결제 객체 생성 paymentId={}, orderId={}", payment.getId(), payment.getOrderId());
 
-        try {
-            Payment savedPayment = paymentRepository.save(payment);
-            // 응답 생성
-            PaymentResponse response = new PaymentResponse(String.valueOf(savedPayment.getId()),
-                savedPayment.getOrderId(),
-                savedPayment.getStatus(), savedPayment.getAmount());
+        paymentCreateWriter.insert(payment);
 
-            log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), savedPayment.getId());
+        PaymentResponse response = new PaymentResponse(String.valueOf(payment.getId()),
+            payment.getOrderId(),
+            payment.getStatus(), payment.getAmount());
 
-            return response;
-        } catch (DataIntegrityViolationException e) {
-            // UNIQUE 제약조건 위반 등 데이터 무결성 오류 발생 시 커스텀 예외로 전환
-            log.warn("[Payment] 결제 Entity 중복 생성 orderId={}", payment.getOrderId());
-            throw new DuplicatePaymentException(request.orderId(), e);
-        }
+        log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), payment.getId());
+
+        return response;
     }
 
     /**

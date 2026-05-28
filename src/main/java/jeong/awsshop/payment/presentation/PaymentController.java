@@ -1,11 +1,13 @@
 package jeong.awsshop.payment.presentation;
 
+import jeong.awsshop.payment.application.PaymentInsertDiagnosticService;
 import jeong.awsshop.payment.application.PaymentService;
-import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
+import jeong.awsshop.payment.presentation.dto.PaymentInsertDiagnosticRequest;
+import jeong.awsshop.payment.presentation.dto.PaymentInsertDiagnosticResponse;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PaymentInsertDiagnosticService paymentInsertDiagnosticService;
 
     @PostMapping()
     public PaymentResponse createPayment(@RequestBody CreatePaymentRequest request) {
@@ -34,6 +37,12 @@ public class PaymentController {
     public TossPaymentConfirmResponse confirmPayment(
         @RequestBody ConfirmPaymentRequest request) {
         return paymentService.confirmPayment(request);
+    }
+
+    @PostMapping("/diagnostics/insert-only")
+    public PaymentInsertDiagnosticResponse createInsertOnlyPayment(
+        @RequestBody PaymentInsertDiagnosticRequest request) {
+        return paymentInsertDiagnosticService.createInsertOnlyPayment(request);
     }
 
     @ResponseStatus(HttpStatus.CONFLICT)
