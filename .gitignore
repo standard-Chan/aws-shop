@@ -44,3 +44,9 @@ aws-dataset/failed-products
 aws-dataset/failed-reviews
 aws-dataset/products
 aws-dataset/reviews
+
+aws-dataset/*.json
+
+logs/
+docs/
+k6/results
