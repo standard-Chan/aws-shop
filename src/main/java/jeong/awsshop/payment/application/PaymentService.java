@@ -8,6 +8,7 @@ import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
+import jeong.awsshop.payment.exception.PaymentTossPaymentProcessingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
@@ -61,7 +62,7 @@ public class PaymentService {
             .status(PaymentStatus.NOT_STARTED)
             .build();
 
-        log.info("[Payment] 결제 객체 생성 orderId={}", payment.getId());
+        log.info("[Payment] 결제 객체 생성 paymentId={}, orderId={}", payment.getId(), payment.getOrderId());
 
         try {
             Payment savedPayment = paymentRepository.save(payment);
@@ -76,7 +77,7 @@ public class PaymentService {
         } catch (DataIntegrityViolationException e) {
             // UNIQUE 제약조건 위반 등 데이터 무결성 오류 발생 시 커스텀 예외로 전환
             log.warn("[Payment] 결제 Entity 중복 생성 orderId={}", payment.getOrderId());
-            throw new DuplicatePaymentException(request.orderId());
+            throw new DuplicatePaymentException(request.orderId(), e);
         }
     }
 
@@ -99,11 +100,16 @@ public class PaymentService {
             // 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
+        } catch (PaymentException exception) {
+            failPayment(payment, exception);
+            throw exception;
+        }
 
-            // TODO : 주문 상태 검증
-            // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
-            // (실제 서비스에서는 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오지 않도록 프론트엔드에서 막는 것이 좋다.)
+        // TODO : 주문 상태 검증
+        // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
+        // (실제 서비스에서는 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오지 않도록 프론트엔드에서 막는 것이 좋다.)
 
+        try {
             // toss 결제 승인 요청
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
@@ -111,6 +117,7 @@ public class PaymentService {
 
             // 결제 승인 완료
             payment.complete();
+            paymentRepository.save(payment);
 
             log.info("[Payment] 결제 승인 완료. paymentKey={}, paymentId={}, amount={}",
                 response.paymentKey(), response.orderId(), response.totalAmount());
@@ -120,25 +127,39 @@ public class PaymentService {
 
             // TODO : 재고 감소 처리
 
-            paymentRepository.save(payment);
             return response;
-        } catch (PaymentException exception) {
-            // 해당 결제 실패 처리
-            payment.fail();
-            paymentRepository.save(payment);
-
-            // Order 상태 pending 변경
-            orderClient.updatePendingOrder(payment.getOrderId());
-
-            // TODO : 만약 재고가 감소된 상태라면, 재고 복구 처리 (재고 감소가 마지막이므로 로직상 문제가 없다면, 재고 감소가 실패한 경우는 없을 것이다.)
-
-            log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
-                confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
+        } catch (PaymentTossPaymentProcessingException exception) {
+            failPayment(payment, exception);
             throw new PaymentConfirmExternalException(confirmRequest.paymentId(),
                 confirmRequest.paymentKey(), exception);
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("[Payment] 결제 승인 처리 중 알 수 없는 에러가 발생했습니다. paymentId={}, orderId={}",
+                confirmRequest.paymentId(), confirmRequest.orderId(), e);
             throw new PaymentException("[Payment] 알 수 없는 에러가 발생하였습니다.", e);
         }
+    }
+
+    private void failPayment(Payment payment, Exception cause) {
+        try {
+            if (payment.getStatus() == PaymentStatus.EXECUTING) {
+                payment.fail();
+                paymentRepository.save(payment);
+            }
+        } catch (RuntimeException rollbackException) {
+            cause.addSuppressed(rollbackException);
+            log.error("[Payment] 결제 실패 상태 저장에 실패했습니다. paymentId={}, orderId={}",
+                payment.getId(), payment.getOrderId(), rollbackException);
+        }
+
+        try {
+            orderClient.updatePendingOrder(payment.getOrderId());
+        } catch (RuntimeException rollbackException) {
+            cause.addSuppressed(rollbackException);
+            log.error("[Payment] 주문 상태를 PENDING 으로 복구하지 못했습니다. paymentId={}, orderId={}",
+                payment.getId(), payment.getOrderId(), rollbackException);
+        }
+
+        log.warn("[Payment] 결제 실패 처리 완료. paymentId={}, orderId={}, status={}",
+            payment.getId(), payment.getOrderId(), payment.getStatus(), cause);
     }
 }
