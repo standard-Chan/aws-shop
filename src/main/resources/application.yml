@@ -12,6 +12,11 @@ spring:
     virtual:
       enabled: true
 
+
+  datasource:
+    hikari:
+      maximum-pool-size: 30  # 최대 커넥션 풀 크기
+
 server:
   port: 8080
 
