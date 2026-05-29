@@ -3,7 +3,6 @@ package jeong.awsshop.analytics.application;
 import java.time.Clock;
 import java.time.Instant;
 import jeong.awsshop.analytics.domain.AnalyticsEventMessage;
-import jeong.awsshop.analytics.domain.AnalyticsEventType;
 import jeong.awsshop.analytics.presentation.dto.AddToCartEventRequest;
 import jeong.awsshop.analytics.presentation.dto.AnalyticsEventResponse;
 import jeong.awsshop.analytics.presentation.dto.ProductViewEventRequest;
@@ -22,68 +21,54 @@ public class AnalyticsEventService {
     private final Clock clock;
 
     public AnalyticsEventResponse recordSearch(SearchEventRequest request) {
-        AnalyticsEventMessage event = newEvent(
-                AnalyticsEventType.SEARCH,
+        AnalyticsEventMessage event = AnalyticsEventMessage.search(
+                nextEventId(),
                 request.userId(),
-                request.keyword(),
-                null,
-                null
+                now(),
+                request.keyword()
         );
         analyticsEventPublisher.publish(event);
         return AnalyticsEventResponse.from(event);
     }
 
     public AnalyticsEventResponse recordProductView(ProductViewEventRequest request) {
-        AnalyticsEventMessage event = newEvent(
-                AnalyticsEventType.PRODUCT_VIEW,
+        AnalyticsEventMessage event = AnalyticsEventMessage.productView(
+                nextEventId(),
                 request.userId(),
-                null,
-                request.productId(),
-                null
+                now(),
+                request.productId()
         );
         analyticsEventPublisher.publish(event);
         return AnalyticsEventResponse.from(event);
     }
 
     public AnalyticsEventResponse recordAddToCart(AddToCartEventRequest request) {
-        AnalyticsEventMessage event = newEvent(
-                AnalyticsEventType.ADD_TO_CART,
+        AnalyticsEventMessage event = AnalyticsEventMessage.addToCart(
+                nextEventId(),
                 request.userId(),
-                null,
-                request.productId(),
-                null
+                now(),
+                request.productId()
         );
         analyticsEventPublisher.publish(event);
         return AnalyticsEventResponse.from(event);
     }
 
     public AnalyticsEventResponse recordPurchase(PurchaseEventRequest request) {
-        AnalyticsEventMessage event = newEvent(
-                AnalyticsEventType.PURCHASE,
+        AnalyticsEventMessage event = AnalyticsEventMessage.purchase(
+                nextEventId(),
                 request.userId(),
-                null,
-                null,
+                now(),
                 request.orderId()
         );
         analyticsEventPublisher.publish(event);
         return AnalyticsEventResponse.from(event);
     }
 
-    private AnalyticsEventMessage newEvent(
-            AnalyticsEventType eventType,
-            Long userId,
-            String keyword,
-            Long productId,
-            Long orderId
-    ) {
-        return new AnalyticsEventMessage(
-                snowflakeIdGenerator.nextId(),
-                eventType,
-                userId,
-                Instant.now(clock),
-                keyword,
-                productId,
-                orderId
-        );
+    private Long nextEventId() {
+        return snowflakeIdGenerator.nextId();
+    }
+
+    private Instant now() {
+        return Instant.now(clock);
     }
 }
