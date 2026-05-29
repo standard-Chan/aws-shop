@@ -22,7 +22,7 @@ BI 대시보드
 LLM 기반 자동 인사이트 생성
 ```
 
-현재 구현은 이 중 `사용자 행동 이벤트 수집 -> Kafka 전송` 단계까지다.
+현재 구현은 이 중 `사용자 행동 이벤트 수집 -> Kafka 전송 -> Consumer 처리 -> Analytics DB 적재` 단계까지다.
 
 ## 완료된 작업
 
@@ -129,55 +129,64 @@ Analytics 테스트와 전체 테스트를 통과시켰다.
 - `OrderInvalidStatusTransitionException` 메시지를 테스트 계약에 맞췄다.
 - `src/test/resources/application-test.yml`에 `external-api.order-server.base-url` 기본값을 추가했다.
 
+### 7. Kafka Consumer와 Analytics DB 적재
+
+2번째 구현으로 Kafka Consumer와 analytics 저장 테이블을 추가했다.
+
+구현 위치:
+
+- `src/main/java/jeong/awsshop/analytics/infrastructure/KafkaAnalyticsEventConsumer.java`
+- `src/main/java/jeong/awsshop/analytics/application/AnalyticsEventStoreService.java`
+- `src/main/java/jeong/awsshop/analytics/domain/AnalyticsStoredEvent.java`
+- `src/main/java/jeong/awsshop/analytics/domain/AnalyticsEventRepository.java`
+
+동작:
+
+- `search-events`, `product-view-events`, `cart-events`, `purchase-events`를 구독한다.
+- Consumer group 기본값은 `analytics-event-consumer-group`이다.
+- Consumer는 받은 `AnalyticsEventMessage`를 `analytics_events`에 저장한다.
+- `eventId`를 PK로 사용하며, 이미 저장된 이벤트는 정상 처리로 보고 skip한다.
+- `createdAt`은 Consumer 저장 시점에 서버 `Clock`으로 생성한다.
+
+운영 DDL:
+
+- 현재 프로젝트는 Flyway/Liquibase를 쓰지 않는다.
+- `prod`는 `ddl-auto: validate`이므로 운영 DB에는 `docs/analytics/ANALYTICS.md`의 `analytics_events` DDL을 먼저 적용해야 한다.
+
 ## 아직 구현하지 않은 것
 
 초기계획서 기준으로 아직 남은 작업은 아래와 같다.
 
 ### 1순위: 필수
 
-#### Consumer 구축
+#### Consumer 운영 고도화
 
-아직 Kafka consumer가 없다.
+기본 Consumer와 DB 적재는 구현했다. 아직 운영 고도화는 남아 있다.
 
 해야 할 일:
 
-- `search-events` consumer
-- `product-view-events` consumer
-- `cart-events` consumer
-- `purchase-events` consumer
-- consumer group 설정
-- 역직렬화 실패 처리
-- 중복 메시지 처리 정책 결정
+- 역직렬화 실패 처리 상세 정책 결정
 - 실패 메시지 재처리 또는 DLT 정책 결정
+- Consumer lag 모니터링
+- 운영 Kafka topic 생성/partition/retention 정책 정리
 
-#### Analytics DB 구축
+#### Analytics DB 운영 고도화
 
-아직 analytics 저장 테이블이 없다.
+기본 `analytics_events` 저장 테이블은 구현했다.
 
 초기 계획은 서비스 DB와 분석 DB 분리지만, 현재 V1 문서에서는 우선 같은 datasource 안에서 analytics 전용 테이블로 논리 분리하기로 했다.
-
-우선 후보:
-
-- `analytics_events` 단일 테이블
-
-예상 컬럼:
-
-```sql
-event_id
-event_type
-user_id
-occurred_at
-keyword
-product_id
-order_id
-created_at
-```
 
 단일 테이블로 시작하는 이유:
 
 - 현재 이벤트 공통 메시지가 이미 단일 구조다.
 - Funnel/KPI 계산을 빠르게 검증하기 좋다.
 - 이벤트별 테이블 분리는 조회 패턴이 명확해진 뒤 해도 된다.
+
+남은 일:
+
+- 운영 DB DDL 적용 방식 자동화
+- 데이터 증가에 따른 partition/archive 정책 검토
+- 조회 패턴 확정 뒤 이벤트별 테이블 또는 집계 테이블 분리 여부 검토
 
 #### Funnel 분석
 
@@ -293,19 +302,7 @@ updated_at
 
 ## 다음 작업 추천 순서
 
-### 1. Consumer + Analytics DB 적재
-
-가장 먼저 해야 한다. 현재는 Kafka로 보내기만 하고 데이터가 남지 않기 때문에 분석 기능으로 이어질 수 없다.
-
-권장 범위:
-
-- `analytics_events` 엔티티/테이블
-- `AnalyticsEventRepository`
-- topic별 `@KafkaListener`
-- 메시지 저장 서비스
-- consumer 단위/통합 테스트
-
-### 2. Funnel API
+### 1. Funnel API
 
 저장된 이벤트를 기반으로 초기계획서의 핵심인 퍼널 분석을 먼저 구현한다.
 
@@ -329,26 +326,24 @@ GET /api/analytics/funnel?from=2026-05-01T00:00:00Z&to=2026-05-29T23:59:59Z
 }
 ```
 
-### 3. KPI API
+### 2. KPI API
 
 퍼널 API 이후 상품/검색어/카테고리 단위 KPI로 확장한다.
 
-### 4. Superset
+### 3. Superset
 
 API보다 BI 경험을 강조하려면 Superset을 붙인다. 단, Superset은 analytics DB에 데이터가 쌓인 뒤 진행하는 것이 맞다.
 
-### 5. Segment + LLM
+### 4. Segment + LLM
 
 세그먼트와 LLM은 분석 데이터가 쌓이고 KPI가 나온 뒤 붙이는 것이 자연스럽다.
 
 ## 현재 판단
 
-현재 작업은 초기계획서의 1순위 중 `이벤트 모델 설계`, `Kafka 구축`의 producer/API 부분까지 완료된 상태다.
+현재 작업은 초기계획서의 1순위 중 `이벤트 모델 설계`, `Kafka 구축`, `Consumer 처리`, `Analytics DB 적재`까지 완료된 상태다.
 
 아직 1순위 필수 작업 중 아래는 미완료다.
 
-- Consumer 구축
-- Analytics DB 구축
 - Funnel 분석
 
-따라서 다음 구현은 Consumer와 Analytics DB 적재를 먼저 진행하는 것이 맞다.
+따라서 다음 구현은 Funnel 분석 API를 진행하는 것이 맞다.
