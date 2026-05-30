@@ -24,7 +24,9 @@
 ### 요청 바디 검증
 
 - `userId`, `productId`, `orderId`는 필수이며 양수여야 한다.
-- `keyword`는 필수이며 blank일 수 없다.
+- 검색 이벤트의 `keyword`는 필수이며 blank일 수 없다.
+- 상품 조회 이벤트의 `searchEventId`는 선택이며, 값이 있으면 양수여야 한다.
+- 상품 조회 이벤트의 `searchKeyword`는 선택이며, 값이 있으면 blank일 수 없다.
 - 요청 검증 실패 시 `400 Bad Request`를 반환한다.
 
 ### 예외 응답
@@ -32,7 +34,7 @@
 | 상태 코드 | 설명 |
 | --- | --- |
 | `202 Accepted` | 이벤트 수집 요청을 검증하고 Kafka 발행 완료 |
-| `400 Bad Request` | 요청 본문 누락, 필수 필드 누락, blank keyword, 0 이하 ID |
+| `400 Bad Request` | 요청 본문 누락, 필수 필드 누락, blank keyword/searchKeyword, 0 이하 ID |
 | `503 Service Unavailable` | Kafka 발행 실패 |
 
 ## 1. 검색 이벤트 수집
@@ -96,8 +98,25 @@ curl -X POST \
 | --- | --- | --- | --- |
 | `userId` | long | Y | 사용자 ID |
 | `productId` | long | Y | 조회한 상품 ID |
+| `searchEventId` | long | N | 이 상품 조회로 이어진 검색 이벤트 ID |
+| `searchKeyword` | string | N | 이 상품 조회로 이어진 검색어 |
+
+`searchEventId`는 값이 있으면 양수여야 한다. `searchKeyword`는 값이 있으면 blank일 수 없다.
+수집 API에서는 `searchEventId`와 `searchKeyword`가 실제 검색 이벤트와 일치하는지 DB로 검증하지 않는다.
+빠른 이벤트 수집을 우선하고, 정합성 평가는 후속 분석/데이터 품질 작업에서 처리한다.
 
 ### 요청 예시
+
+```json
+{
+  "userId": 1,
+  "productId": 100,
+  "searchEventId": 123,
+  "searchKeyword": "macbook"
+}
+```
+
+기존 요청도 계속 허용한다.
 
 ```json
 {
@@ -123,7 +142,9 @@ curl -X POST \
   -H 'Content-Type: application/json' \
   -d '{
     "userId": 1,
-    "productId": 100
+    "productId": 100,
+    "searchEventId": 123,
+    "searchKeyword": "macbook"
   }'
 ```
 
@@ -231,7 +252,23 @@ API 응답에는 포함하지 않지만, Kafka에는 아래 공통 구조로 발
   "occurredAt": "2026-05-29T03:00:00Z",
   "keyword": "macbook",
   "productId": null,
-  "orderId": null
+  "orderId": null,
+  "searchEventId": null
+}
+```
+
+상품 조회 이벤트가 검색에서 이어졌다면 `keyword`에는 `searchKeyword`가 들어가고, `searchEventId`에는 연결 대상 검색 이벤트 ID가 들어간다.
+
+```json
+{
+  "eventId": 124,
+  "eventType": "PRODUCT_VIEW",
+  "userId": 1,
+  "occurredAt": "2026-05-29T03:00:10Z",
+  "keyword": "macbook",
+  "productId": 100,
+  "orderId": null,
+  "searchEventId": 123
 }
 ```
 
@@ -241,6 +278,7 @@ API 응답에는 포함하지 않지만, Kafka에는 아래 공통 구조로 발
 | `eventType` | string | `SEARCH`, `PRODUCT_VIEW`, `ADD_TO_CART`, `PURCHASE` |
 | `userId` | long | 사용자 ID |
 | `occurredAt` | string | 서버 기준 이벤트 수집 시각, UTC ISO-8601 |
-| `keyword` | string or `null` | 검색 이벤트의 키워드 |
+| `keyword` | string or `null` | `SEARCH.keyword` 또는 `PRODUCT_VIEW.searchKeyword` |
 | `productId` | long or `null` | 상품 조회/장바구니 이벤트의 상품 ID |
 | `orderId` | long or `null` | 구매 이벤트의 주문 ID |
+| `searchEventId` | long or `null` | 상품 조회 이벤트가 이어진 검색 이벤트 ID |
