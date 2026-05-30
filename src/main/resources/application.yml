@@ -19,6 +19,14 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: jeong.awsshop.analytics.domain.AnalyticsEventMessage
+        spring.json.trusted.packages: jeong.awsshop.analytics.domain
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -38,3 +46,5 @@ app:
         product-view: ${ANALYTICS_TOPIC_PRODUCT_VIEW:product-view-events}
         cart: ${ANALYTICS_TOPIC_CART:cart-events}
         purchase: ${ANALYTICS_TOPIC_PURCHASE:purchase-events}
+      consumer:
+        group-id: ${ANALYTICS_CONSUMER_GROUP_ID:analytics-event-consumer-group}
