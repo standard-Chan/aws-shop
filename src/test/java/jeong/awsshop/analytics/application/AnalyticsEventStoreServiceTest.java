@@ -5,6 +5,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -72,5 +73,34 @@ class AnalyticsEventStoreServiceTest {
         analyticsEventStoreService.saveIfAbsent(message);
 
         verify(analyticsEventRepository, never()).save(org.mockito.Mockito.any(AnalyticsStoredEvent.class));
+    }
+
+    @Test
+    @DisplayName("batch 저장은 기존 eventId를 한 번에 걸러내고 신규 이벤트만 저장해야 한다")
+    void should_save_only_new_events_in_batch() {
+        AnalyticsEventMessage existing = AnalyticsEventMessage.search(
+                1L,
+                10L,
+                Instant.parse("2026-05-29T03:00:00Z"),
+                "macbook"
+        );
+        AnalyticsEventMessage created = AnalyticsEventMessage.addToCart(
+                2L,
+                10L,
+                Instant.parse("2026-05-29T03:01:00Z"),
+                100L
+        );
+        when(analyticsEventRepository.findAllById(org.mockito.Mockito.anySet()))
+                .thenReturn(List.of(AnalyticsStoredEvent.from(existing, Instant.parse("2026-05-29T04:00:00Z"))));
+
+        analyticsEventStoreService.saveAllIfAbsent(List.of(existing, created));
+
+        ArgumentCaptor<List<AnalyticsStoredEvent>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(analyticsEventRepository).saveAll(eventsCaptor.capture());
+        List<AnalyticsStoredEvent> savedEvents = eventsCaptor.getValue();
+        assertThat(savedEvents).hasSize(1);
+        assertThat(savedEvents.get(0).getEventId()).isEqualTo(2L);
+        assertThat(savedEvents.get(0).getCreatedAt())
+                .isEqualTo(Instant.parse("2026-05-29T04:00:00Z"));
     }
 }

@@ -6,11 +6,15 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Persistable;
 
 /**
  * Kafka에서 소비한 사용자 행동 이벤트를 analytics_events 테이블에 저장하는 엔티티다.
@@ -28,7 +32,7 @@ import lombok.NoArgsConstructor;
                 @Index(name = "idx_analytics_events_type_keyword_occurred_at", columnList = "event_type, keyword, occurred_at")
         }
 )
-public class AnalyticsStoredEvent {
+public class AnalyticsStoredEvent implements Persistable<Long> {
 
     @Id
     @Column(name = "event_id")
@@ -58,6 +62,9 @@ public class AnalyticsStoredEvent {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Transient
+    private boolean isNew = true;
 
     private AnalyticsStoredEvent(
             Long eventId,
@@ -97,5 +104,21 @@ public class AnalyticsStoredEvent {
                 message.searchEventId(),
                 createdAt
         );
+    }
+
+    @Override
+    public Long getId() {
+        return eventId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PostPersist
+    private void markNotNew() {
+        this.isNew = false;
     }
 }

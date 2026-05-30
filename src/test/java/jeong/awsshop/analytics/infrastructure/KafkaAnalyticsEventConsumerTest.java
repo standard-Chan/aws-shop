@@ -2,6 +2,7 @@ package jeong.awsshop.analytics.infrastructure;
 
 import static org.mockito.Mockito.verify;
 
+import java.util.List;
 import java.time.Instant;
 import jeong.awsshop.analytics.application.AnalyticsEventStoreService;
 import jeong.awsshop.analytics.domain.AnalyticsEventMessage;
@@ -26,9 +27,9 @@ class KafkaAnalyticsEventConsumerTest {
                 "macbook"
         );
 
-        consumer.consumeSearch(message);
+        consumer.consumeSearch(List.of(message));
 
-        verify(analyticsEventStoreService).saveIfAbsent(message);
+        verify(analyticsEventStoreService).saveAllIfAbsent(List.of(message));
     }
 
     @Test
@@ -41,9 +42,9 @@ class KafkaAnalyticsEventConsumerTest {
                 100L
         );
 
-        consumer.consumeProductView(message);
+        consumer.consumeProductView(List.of(message));
 
-        verify(analyticsEventStoreService).saveIfAbsent(message);
+        verify(analyticsEventStoreService).saveAllIfAbsent(List.of(message));
     }
 
     @Test
@@ -56,9 +57,9 @@ class KafkaAnalyticsEventConsumerTest {
                 100L
         );
 
-        consumer.consumeAddToCart(message);
+        consumer.consumeAddToCart(List.of(message));
 
-        verify(analyticsEventStoreService).saveIfAbsent(message);
+        verify(analyticsEventStoreService).saveAllIfAbsent(List.of(message));
     }
 
     @Test
@@ -71,8 +72,8 @@ class KafkaAnalyticsEventConsumerTest {
                 500L
         );
 
-        consumer.consumePurchase(message);
+        consumer.consumePurchase(List.of(message));
 
-        verify(analyticsEventStoreService).saveIfAbsent(message);
+        verify(analyticsEventStoreService).saveAllIfAbsent(List.of(message));
     }
 }

@@ -23,10 +23,13 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       auto-offset-reset: earliest
+      max-poll-records: ${ANALYTICS_CONSUMER_MAX_POLL_RECORDS:500}
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.value.default.type: jeong.awsshop.analytics.domain.AnalyticsEventMessage
         spring.json.trusted.packages: jeong.awsshop.analytics.domain
+        fetch.min.bytes: ${ANALYTICS_CONSUMER_FETCH_MIN_BYTES:1}
+        fetch.max.wait.ms: ${ANALYTICS_CONSUMER_FETCH_MAX_WAIT_MS:500}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -48,3 +51,6 @@ app:
         purchase: ${ANALYTICS_TOPIC_PURCHASE:purchase-events}
       consumer:
         group-id: ${ANALYTICS_CONSUMER_GROUP_ID:analytics-event-consumer-group}
+        concurrency: ${ANALYTICS_CONSUMER_CONCURRENCY:1}
+    benchmark:
+      direct-store-enabled: ${ANALYTICS_BENCHMARK_DIRECT_STORE_ENABLED:false}

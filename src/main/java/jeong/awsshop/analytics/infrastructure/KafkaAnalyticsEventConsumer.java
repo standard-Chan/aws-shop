@@ -1,5 +1,6 @@
 package jeong.awsshop.analytics.infrastructure;
 
+import java.util.List;
 import jeong.awsshop.analytics.application.AnalyticsEventStoreService;
 import jeong.awsshop.analytics.domain.AnalyticsEventMessage;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +21,11 @@ public class KafkaAnalyticsEventConsumer {
      */
     @KafkaListener(
             topics = "${app.analytics.kafka.topics.search:search-events}",
-            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}"
+            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}",
+            containerFactory = "analyticsKafkaBatchListenerContainerFactory"
     )
-    public void consumeSearch(AnalyticsEventMessage message) {
-        analyticsEventStoreService.saveIfAbsent(message);
+    public void consumeSearch(List<AnalyticsEventMessage> messages) {
+        analyticsEventStoreService.saveAllIfAbsent(messages);
     }
 
     /**
@@ -31,10 +33,11 @@ public class KafkaAnalyticsEventConsumer {
      */
     @KafkaListener(
             topics = "${app.analytics.kafka.topics.product-view:product-view-events}",
-            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}"
+            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}",
+            containerFactory = "analyticsKafkaBatchListenerContainerFactory"
     )
-    public void consumeProductView(AnalyticsEventMessage message) {
-        analyticsEventStoreService.saveIfAbsent(message);
+    public void consumeProductView(List<AnalyticsEventMessage> messages) {
+        analyticsEventStoreService.saveAllIfAbsent(messages);
     }
 
     /**
@@ -42,10 +45,11 @@ public class KafkaAnalyticsEventConsumer {
      */
     @KafkaListener(
             topics = "${app.analytics.kafka.topics.cart:cart-events}",
-            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}"
+            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}",
+            containerFactory = "analyticsKafkaBatchListenerContainerFactory"
     )
-    public void consumeAddToCart(AnalyticsEventMessage message) {
-        analyticsEventStoreService.saveIfAbsent(message);
+    public void consumeAddToCart(List<AnalyticsEventMessage> messages) {
+        analyticsEventStoreService.saveAllIfAbsent(messages);
     }
 
     /**
@@ -53,9 +57,10 @@ public class KafkaAnalyticsEventConsumer {
      */
     @KafkaListener(
             topics = "${app.analytics.kafka.topics.purchase:purchase-events}",
-            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}"
+            groupId = "${app.analytics.kafka.consumer.group-id:analytics-event-consumer-group}",
+            containerFactory = "analyticsKafkaBatchListenerContainerFactory"
     )
-    public void consumePurchase(AnalyticsEventMessage message) {
-        analyticsEventStoreService.saveIfAbsent(message);
+    public void consumePurchase(List<AnalyticsEventMessage> messages) {
+        analyticsEventStoreService.saveAllIfAbsent(messages);
     }
 }
