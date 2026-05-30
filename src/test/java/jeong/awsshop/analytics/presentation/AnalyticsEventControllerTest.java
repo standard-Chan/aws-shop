@@ -1,6 +1,8 @@
 package jeong.awsshop.analytics.presentation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +18,7 @@ import jeong.awsshop.analytics.presentation.dto.PurchaseEventRequest;
 import jeong.awsshop.analytics.presentation.dto.SearchEventRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -67,6 +70,62 @@ class AnalyticsEventControllerTest {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.eventId").value(101L))
                 .andExpect(jsonPath("$.eventType").value("PRODUCT_VIEW"));
+    }
+
+    @Test
+    @DisplayName("상품 조회 이벤트는 searchEventId와 searchKeyword가 있으면 함께 받을 수 있어야 한다")
+    void should_accept_product_view_event_with_search_context() throws Exception {
+        when(analyticsEventService.recordProductView(any(ProductViewEventRequest.class)))
+                .thenReturn(new AnalyticsEventResponse(101L, AnalyticsEventType.PRODUCT_VIEW));
+
+        mockMvc.perform(post("/api/analytics/events/product-view")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 1,
+                                  "productId": 100,
+                                  "searchEventId": 50,
+                                  "searchKeyword": "macbook"
+                                }
+                                """))
+                .andExpect(status().isAccepted());
+
+        ArgumentCaptor<ProductViewEventRequest> requestCaptor = ArgumentCaptor.forClass(ProductViewEventRequest.class);
+        verify(analyticsEventService).recordProductView(requestCaptor.capture());
+        ProductViewEventRequest request = requestCaptor.getValue();
+        assertThat(request.searchEventId()).isEqualTo(50L);
+        assertThat(request.searchKeyword()).isEqualTo("macbook");
+    }
+
+    @Test
+    @DisplayName("상품 조회 이벤트의 searchEventId가 0 이하이면 400을 반환해야 한다")
+    void should_return_bad_request_when_search_event_id_is_not_positive() throws Exception {
+        mockMvc.perform(post("/api/analytics/events/product-view")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 1,
+                                  "productId": 100,
+                                  "searchEventId": 0,
+                                  "searchKeyword": "macbook"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("상품 조회 이벤트의 searchKeyword가 blank이면 400을 반환해야 한다")
+    void should_return_bad_request_when_search_keyword_is_blank() throws Exception {
+        mockMvc.perform(post("/api/analytics/events/product-view")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 1,
+                                  "productId": 100,
+                                  "searchKeyword": " "
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

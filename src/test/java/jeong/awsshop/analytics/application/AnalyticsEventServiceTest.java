@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import jeong.awsshop.analytics.domain.AnalyticsEventMessage;
 import jeong.awsshop.analytics.domain.AnalyticsEventType;
+import jeong.awsshop.analytics.presentation.dto.ProductViewEventRequest;
 import jeong.awsshop.analytics.presentation.dto.SearchEventRequest;
 import jeong.awsshop.analytics.presentation.dto.AnalyticsEventResponse;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
@@ -55,5 +56,24 @@ class AnalyticsEventServiceTest {
         assertThat(event.keyword()).isEqualTo("macbook");
         assertThat(event.productId()).isNull();
         assertThat(event.orderId()).isNull();
+        assertThat(event.searchEventId()).isNull();
+    }
+
+    @Test
+    @DisplayName("상품 조회 이벤트는 검색 컨텍스트를 함께 publisher에 전달해야 한다")
+    void should_publish_product_view_event_with_search_context() {
+        AnalyticsEventResponse response = analyticsEventService.recordProductView(
+                new ProductViewEventRequest(1L, 100L, 50L, "macbook")
+        );
+
+        ArgumentCaptor<AnalyticsEventMessage> eventCaptor = ArgumentCaptor.forClass(AnalyticsEventMessage.class);
+        verify(analyticsEventPublisher).publish(eventCaptor.capture());
+
+        AnalyticsEventMessage event = eventCaptor.getValue();
+        assertThat(response.eventId()).isEqualTo(event.eventId());
+        assertThat(response.eventType()).isEqualTo(AnalyticsEventType.PRODUCT_VIEW);
+        assertThat(event.productId()).isEqualTo(100L);
+        assertThat(event.searchEventId()).isEqualTo(50L);
+        assertThat(event.keyword()).isEqualTo("macbook");
     }
 }
