@@ -15,14 +15,14 @@ Consumer 처리
         ↓
 Analytics DB 적재
         ↓
-퍼널 분석
+퍼널/KPI 분석
         ↓
 BI 대시보드
         ↓
 LLM 기반 자동 인사이트 생성
 ```
 
-현재 구현은 이 중 `사용자 행동 이벤트 수집 -> Kafka 전송 -> Consumer 처리 -> Analytics DB 적재` 단계까지다.
+현재 구현은 이 중 `사용자 행동 이벤트 수집 -> Kafka 전송 -> Consumer 처리 -> Analytics DB 적재 -> 퍼널 분석 -> KPI 분석 API` 단계까지다.
 
 ## 완료된 작업
 
@@ -45,6 +45,8 @@ LLM 기반 자동 인사이트 생성
 
 현재는 기존 상품/주문/결제 API에서 자동으로 이벤트를 발행하지 않는다. 프론트엔드 또는 호출자가 analytics 전용 API를 직접 호출하는 방식이다.
 
+상품 상세 조회 이벤트는 검색어별 CTR 계산을 위해 선택 필드 `searchEventId`, `searchKeyword`를 추가로 받을 수 있다. 기존 `{ "userId": 1, "productId": 100 }` 요청은 계속 허용한다.
+
 ### 2. 이벤트 도메인 모델
 
 Kafka로 발행할 공통 메시지 모델을 만들었다.
@@ -62,7 +64,8 @@ Kafka로 발행할 공통 메시지 모델을 만들었다.
   "occurredAt": "2026-05-29T03:00:00Z",
   "keyword": "macbook",
   "productId": null,
-  "orderId": null
+  "orderId": null,
+  "searchEventId": null
 }
 ```
 
@@ -114,6 +117,9 @@ Analytics 기준 문서와 API 문서를 추가했다.
 
 - `docs/analytics/ANALYTICS.md`
 - `docs/api/analytics-event-controller-api.md`
+- `docs/api/analytics-kpi-controller-api.md`
+
+이벤트 API 문서는 Product View 확장 필드와 Kafka 메시지의 `searchEventId`까지 반영했다.
 
 ### 6. 테스트 안정화
 
@@ -153,6 +159,111 @@ Analytics 테스트와 전체 테스트를 통과시켰다.
 - 현재 프로젝트는 Flyway/Liquibase를 쓰지 않는다.
 - `prod`는 `ddl-auto: validate`이므로 운영 DB에는 `docs/analytics/ANALYTICS.md`의 `analytics_events` DDL을 먼저 적용해야 한다.
 
+### 8. Funnel 분석 API
+
+3번째 구현으로 `analytics_events` 기반 Funnel 분석 조회 API를 추가했다.
+
+구현 위치:
+
+- `src/main/java/jeong/awsshop/analytics/presentation/AnalyticsFunnelController.java`
+- `src/main/java/jeong/awsshop/analytics/application/AnalyticsFunnelService.java`
+- `src/main/java/jeong/awsshop/analytics/domain/AnalyticsEventTypeCount.java`
+- `src/main/java/jeong/awsshop/analytics/presentation/dto/AnalyticsFunnelResponse.java`
+- `src/main/java/jeong/awsshop/analytics/presentation/dto/AnalyticsFunnelStepResponse.java`
+
+동작:
+
+- `GET /api/analytics/funnel?from=...&to=...`로 조회한다.
+- `from`, `to`는 필수 ISO-8601 Instant 문자열이다.
+- 조회 기준은 `occurred_at >= from AND occurred_at < to`다.
+- 기준은 이벤트 수 기반 `EVENT_COUNT`다.
+- 단계 순서는 `SEARCH -> PRODUCT_VIEW -> ADD_TO_CART -> PURCHASE`로 고정한다.
+- 각 단계별 count, 직전 단계 대비 전환율, 검색 단계 대비 전환율을 반환한다.
+- 조회 결과가 없는 단계는 count `0`으로 채우고, 전환율 분모가 `0`이면 `0.0`으로 처리한다.
+- `conversionRateFromPrevious`는 첫 단계의 직전 단계가 없음을 표현하기 위해 nullable `Double`을 사용한다.
+- `conversionRateFromSearch`는 항상 숫자를 반환하므로 primitive `double`을 사용한다.
+- `AnalyticsFunnelService`에는 집계 결과를 고정 퍼널 순서로 재구성하는 의도와 전환율 계산 규칙을 주석으로 남겼다.
+
+테스트/호출 예시:
+
+- `src/test/java/jeong/awsshop/analytics/domain/AnalyticsEventRepositoryTest.java`
+- `src/test/java/jeong/awsshop/analytics/application/AnalyticsFunnelServiceTest.java`
+- `src/test/java/jeong/awsshop/analytics/presentation/AnalyticsFunnelControllerTest.java`
+- `src/test/http/analytics/analytics-funnel-api.http`
+
+검증 결과:
+
+```bash
+./gradlew test --tests '*Analytics*' --no-daemon -Dorg.gradle.cache.internal.locklistener=false
+./gradlew test --no-daemon -Dorg.gradle.cache.internal.locklistener=false
+```
+
+둘 다 통과했다.
+
+### 9. KPI 분석 API
+
+4번째 구현으로 `analytics_events` 기반 KPI 분석 조회 API를 추가했다.
+
+구현 위치:
+
+- `src/main/java/jeong/awsshop/analytics/presentation/AnalyticsKpiController.java`
+- `src/main/java/jeong/awsshop/analytics/application/AnalyticsKpiService.java`
+- `src/main/java/jeong/awsshop/analytics/presentation/dto/AnalyticsKpiSummaryResponse.java`
+- `src/main/java/jeong/awsshop/analytics/presentation/dto/AnalyticsProductKpiResponse.java`
+- `src/main/java/jeong/awsshop/analytics/presentation/dto/AnalyticsKeywordKpiResponse.java`
+- `src/main/java/jeong/awsshop/analytics/domain/AnalyticsProductKpiCount.java`
+- `src/main/java/jeong/awsshop/analytics/domain/AnalyticsKeywordKpiCount.java`
+
+동작:
+
+- `GET /api/analytics/kpis/summary?from=...&to=...`로 전체 요약 KPI를 조회한다.
+- `GET /api/analytics/kpis/products?from=...&to=...&limit=20`로 상품별 KPI를 조회한다.
+- `GET /api/analytics/kpis/keywords?from=...&to=...&limit=20`로 검색어별 KPI를 조회한다.
+- KPI 기준은 Funnel API와 동일한 이벤트 수 기반 `EVENT_COUNT`다.
+- 기간 조건은 `occurred_at >= from AND occurred_at < to`다.
+- `from >= to`이면 `400 Bad Request`를 반환한다.
+- `limit` 기본값은 `20`, 허용 범위는 `1..100`이다.
+- rate 계산에서 분모가 `0`이면 `0.0`으로 처리한다.
+
+Product View 이벤트 확장:
+
+- `ProductViewEventRequest`에 nullable `searchEventId`, `searchKeyword`를 추가했다.
+- `AnalyticsEventMessage`와 `AnalyticsStoredEvent`에 nullable `searchEventId`를 추가했다.
+- `PRODUCT_VIEW.searchKeyword`는 기존 `keyword` 컬럼에 저장한다.
+- 수집 API에서는 `searchEventId`와 `searchKeyword`가 실제 검색 이벤트와 일치하는지 DB로 검증하지 않는다.
+- 기존 `{ "userId": 1, "productId": 100 }` 요청도 계속 허용한다.
+
+KPI 계산:
+
+- Summary: `searchCtr = productViewCount / searchCount`
+- Summary: `cartRate = addToCartCount / productViewCount`
+- Summary: `purchaseRate = purchaseCount / productViewCount`
+- Product: `cartRate = addToCartCount / productViewCount`
+- Product: `purchaseRate`는 V1에서 `null`이다.
+- Keyword: `searchCtr = productViewCount / searchCount`
+
+검증 결과:
+
+```bash
+./gradlew test --tests '*Analytics*' --no-daemon -Dorg.gradle.cache.internal.locklistener=false
+./gradlew test --no-daemon -Dorg.gradle.cache.internal.locklistener=false
+```
+
+통과했다.
+
+테스트/호출 예시:
+
+- `src/test/http/analytics/analytics-event-api.http`
+- `src/test/http/analytics/analytics-funnel-api.http`
+- `src/test/http/analytics/analytics-kpi-api.http`
+- `src/test/http/analytics/analytics-api-test.http`
+- `src/test/analytics/analytics-api-test.http`
+
+코드 가독성 보강:
+
+- KPI service/controller/repository 메서드에 짧은 의도 주석을 추가했다.
+- 이벤트 메시지 factory와 Product View 선택 필드 검증 메서드에 의도 주석을 추가했다.
+
 ## 아직 구현하지 않은 것
 
 초기계획서 기준으로 아직 남은 작업은 아래와 같다.
@@ -188,49 +299,7 @@ Analytics 테스트와 전체 테스트를 통과시켰다.
 - 데이터 증가에 따른 partition/archive 정책 검토
 - 조회 패턴 확정 뒤 이벤트별 테이블 또는 집계 테이블 분리 여부 검토
 
-#### Funnel 분석
-
-아직 퍼널 분석 API가 없다.
-
-초기계획서 기준 퍼널:
-
-```text
-Search
- ↓
-Product View
- ↓
-Add To Cart
- ↓
-Purchase
-```
-
-해야 할 일:
-
-- 기간 조건 기반 이벤트 count 조회
-- 단계별 count 응답
-- 단계 간 전환율 계산
-- 빈 데이터, 0 나눗셈 처리
-- 사용자 기준 퍼널로 볼지 이벤트 수 기준 퍼널로 볼지 결정
-
 ### 2순위: 중요
-
-#### KPI 계산
-
-아직 KPI API가 없다.
-
-초기계획서 기준 KPI:
-
-- Search CTR = Product View / Search
-- Cart Rate = Add To Cart / Product View
-- Purchase Rate = Purchase / Product View
-
-해야 할 일:
-
-- KPI 조회 API 설계
-- 기간 필터
-- 상품별 KPI
-- 검색어별 KPI
-- 카테고리별 KPI
 
 #### 사용자 관심사 세그먼트 생성
 
@@ -302,48 +371,31 @@ updated_at
 
 ## 다음 작업 추천 순서
 
-### 1. Funnel API
+### 1. KPI API
 
-저장된 이벤트를 기반으로 초기계획서의 핵심인 퍼널 분석을 먼저 구현한다.
+전체 요약, 상품별, 검색어별 KPI는 구현했다. 후속 KPI 작업은 product table join이 필요한 카테고리별 KPI다.
 
-권장 API:
+우선순위:
 
-```text
-GET /api/analytics/funnel?from=2026-05-01T00:00:00Z&to=2026-05-29T23:59:59Z
-```
+1. 카테고리별 KPI
+2. 상품별 구매율 계산을 위한 PURCHASE 이벤트 또는 주문 상품 라인 모델링
+3. 사용자 수 기반 deduplication KPI
 
-권장 응답:
-
-```json
-{
-  "searchCount": 10000,
-  "productViewCount": 4000,
-  "addToCartCount": 1200,
-  "purchaseCount": 300,
-  "searchToViewRate": 0.4,
-  "viewToCartRate": 0.3,
-  "viewToPurchaseRate": 0.075
-}
-```
-
-### 2. KPI API
-
-퍼널 API 이후 상품/검색어/카테고리 단위 KPI로 확장한다.
-
-### 3. Superset
+### 2. Superset
 
 API보다 BI 경험을 강조하려면 Superset을 붙인다. 단, Superset은 analytics DB에 데이터가 쌓인 뒤 진행하는 것이 맞다.
 
-### 4. Segment + LLM
+### 3. Segment + LLM
 
 세그먼트와 LLM은 분석 데이터가 쌓이고 KPI가 나온 뒤 붙이는 것이 자연스럽다.
 
 ## 현재 판단
 
-현재 작업은 초기계획서의 1순위 중 `이벤트 모델 설계`, `Kafka 구축`, `Consumer 처리`, `Analytics DB 적재`까지 완료된 상태다.
+현재 작업은 초기계획서의 1순위 중 `이벤트 모델 설계`, `Kafka 구축`, `Consumer 처리`, `Analytics DB 적재`, `Funnel 분석`, `KPI 계산 API`까지 완료된 상태다.
 
-아직 1순위 필수 작업 중 아래는 미완료다.
+아직 2순위 중요 작업 중 아래는 미완료다.
 
-- Funnel 분석
+- Superset 대시보드
+- 사용자 관심사 세그먼트 생성
 
-따라서 다음 구현은 Funnel 분석 API를 진행하는 것이 맞다.
+따라서 다음 구현은 Superset 대시보드, 사용자 세그먼트, 카테고리별 KPI 중 하나를 선택하는 것이 자연스럽다.
