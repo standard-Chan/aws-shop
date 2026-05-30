@@ -36,7 +36,9 @@ public class AnalyticsEventService {
                 nextEventId(),
                 request.userId(),
                 now(),
-                request.productId()
+                request.productId(),
+                request.searchEventId(),
+                request.searchKeyword()
         );
         analyticsEventPublisher.publish(event);
         return AnalyticsEventResponse.from(event);

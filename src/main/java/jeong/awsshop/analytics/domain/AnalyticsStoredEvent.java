@@ -22,7 +22,10 @@ import lombok.NoArgsConstructor;
         name = "analytics_events",
         indexes = {
                 @Index(name = "idx_analytics_events_type_occurred_at", columnList = "event_type, occurred_at"),
-                @Index(name = "idx_analytics_events_user_occurred_at", columnList = "user_id, occurred_at")
+                @Index(name = "idx_analytics_events_user_occurred_at", columnList = "user_id, occurred_at"),
+                @Index(name = "idx_analytics_events_search_event_id", columnList = "search_event_id"),
+                @Index(name = "idx_analytics_events_type_product_occurred_at", columnList = "event_type, product_id, occurred_at"),
+                @Index(name = "idx_analytics_events_type_keyword_occurred_at", columnList = "event_type, keyword, occurred_at")
         }
 )
 public class AnalyticsStoredEvent {
@@ -50,6 +53,9 @@ public class AnalyticsStoredEvent {
     @Column(name = "order_id")
     private Long orderId;
 
+    @Column(name = "search_event_id")
+    private Long searchEventId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -61,6 +67,7 @@ public class AnalyticsStoredEvent {
             String keyword,
             Long productId,
             Long orderId,
+            Long searchEventId,
             Instant createdAt
     ) {
         this.eventId = eventId;
@@ -70,11 +77,13 @@ public class AnalyticsStoredEvent {
         this.keyword = keyword;
         this.productId = productId;
         this.orderId = orderId;
+        this.searchEventId = searchEventId;
         this.createdAt = createdAt;
     }
 
     /**
-     * Consumer 저장 단계에서 Kafka 메시지를 DB 저장 엔티티로 변환할 때 호출된다.
+     * Consumer 저장 단계에서 Kafka 메시지를 DB 저장 엔티티로 변환한다.
+     * PRODUCT_VIEW의 searchKeyword는 keyword 컬럼에 함께 저장해 검색어별 집계를 단순화한다.
      */
     public static AnalyticsStoredEvent from(AnalyticsEventMessage message, Instant createdAt) {
         return new AnalyticsStoredEvent(
@@ -85,6 +94,7 @@ public class AnalyticsStoredEvent {
                 message.keyword(),
                 message.productId(),
                 message.orderId(),
+                message.searchEventId(),
                 createdAt
         );
     }
