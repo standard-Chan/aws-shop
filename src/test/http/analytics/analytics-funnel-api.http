@@ -1,0 +1,15 @@
+### Funnel 분석 조회
+GET http://localhost:8080/api/analytics/funnel?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z
+Accept: application/json
+
+### Funnel 분석 조회 - 최근 넓은 기간
+GET http://localhost:8080/api/analytics/funnel?from=2026-01-01T00:00:00Z&to=2027-01-01T00:00:00Z
+Accept: application/json
+
+### 잘못된 Funnel 분석 요청 - from 누락
+GET http://localhost:8080/api/analytics/funnel?to=2026-06-01T00:00:00Z
+Accept: application/json
+
+### 잘못된 Funnel 분석 요청 - from이 to보다 빠르지 않음
+GET http://localhost:8080/api/analytics/funnel?from=2026-06-01T00:00:00Z&to=2026-06-01T00:00:00Z
+Accept: application/json

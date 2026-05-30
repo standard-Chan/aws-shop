@@ -1,0 +1,19 @@
+### Summary KPI 조회
+GET http://localhost:8080/api/analytics/kpis/summary?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z
+Accept: application/json
+
+### Product KPI 조회
+GET http://localhost:8080/api/analytics/kpis/products?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z&limit=20
+Accept: application/json
+
+### Keyword KPI 조회
+GET http://localhost:8080/api/analytics/kpis/keywords?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z&limit=20
+Accept: application/json
+
+### 잘못된 KPI 요청 - from 누락
+GET http://localhost:8080/api/analytics/kpis/summary?to=2026-06-01T00:00:00Z
+Accept: application/json
+
+### 잘못된 KPI 요청 - limit 범위 초과
+GET http://localhost:8080/api/analytics/kpis/products?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z&limit=101
+Accept: application/json

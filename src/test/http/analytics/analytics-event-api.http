@@ -1,0 +1,46 @@
+### 검색 이벤트 수집
+POST http://localhost:8080/api/analytics/events/search
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "keyword": "macbook"
+}
+
+### 상품 상세 조회 이벤트 수집
+POST http://localhost:8080/api/analytics/events/product-view
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "productId": 100,
+  "searchEventId": 1,
+  "searchKeyword": "macbook"
+}
+
+### 장바구니 추가 이벤트 수집
+POST http://localhost:8080/api/analytics/events/add-to-cart
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "productId": 100
+}
+
+### 구매 이벤트 수집
+POST http://localhost:8080/api/analytics/events/purchase
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "orderId": 500
+}
+
+### 잘못된 검색 이벤트 요청 - 400 Bad Request
+POST http://localhost:8080/api/analytics/events/search
+Content-Type: application/json
+
+{
+  "userId": 0,
+  "keyword": ""
+}
