@@ -3,7 +3,7 @@ POST localhost:8080/api/payments
 Content-Type: application/json
 
 {
-  "orderId": 3
+  "orderId": 2
 }
 
 ### 결제 승인 요청

@@ -4,16 +4,12 @@ import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.exception.DuplicatePaymentException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
-import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
-import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
-import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
@@ -70,127 +66,55 @@ public class PaymentService {
         OrderSummary order;
         try {
             order = orderClient.updateExecutingStatus(request.orderId());
-        }
-        // 이미 Payment 가 존재 하는 경우
-        catch (PaymentOrderAlreadyExecutingException exception) {
-            return recoverOrReuseExistingPayment(request.orderId());
-        } catch (PaymentOrderAlreadyCompletedException
-                 | PaymentOrderAlreadyCanceledException
-                 | PaymentOrderExpiredException exception) {
+        } catch (PaymentOrderAlreadyExecutingException exception) {
+            return resolveAlreadyExecutingPayment(request.orderId());
+        } catch (PaymentException exception) {
             throw exception;
         } catch (RuntimeException exception) {
             throw new PaymentOrderLookupException(request.orderId(), exception);
         }
 
-        log.info("[Payment] 주문 상태 EXECUTING 갱신 완료 = {}", order.orderId());
         return createNewPayment(order);
     }
 
-    /**
-     * order 가 이미 EXECUTING 인 경우, 기존 활성 결제를 재사용할지 만료/복구 예외를 반환할지 결정한다.
-     *
-     * 용어:
-     * active payment 는 결제 진행 중이거나 결제 시작 전인 상태의 결제를 의미한다. (NOT_STARTED, EXECUTING)
-     */
-    private PaymentResponse recoverOrReuseExistingPayment(Long orderId) {
-        List<Payment> activePayments = paymentRepository.findAllByOrderIdAndStatusIn(orderId, ACTIVE_PAYMENT_STATUSES);
-
-        if (activePayments.size() > 1) {
-            log.error("[Payment] 처리 중인 결제가 2개 이상 존재합니다. orderId={}, count={}",
-                orderId, activePayments.size());
-            throw new PaymentException("[Payment] 처리 중인 결제가 2개 이상 존재합니다. orderId=" + orderId);
-        }
-
-        Payment activePayment = activePayments.isEmpty() ? null : activePayments.get(0);
-
-        // 결제가 존재하고, 만료되지 않았다면 그대로 반환한다.
-        if (activePayment != null && !activePayment.isExpired(LocalDateTime.now())) {
-            log.info("[Payment] 존재하는 결제 재사용 orderId={}, paymentId={}, status={}",
-                orderId, activePayment.getId(), activePayment.getStatus());
-            return PaymentResponse.from(activePayment);
-        }
-
-        // 결제가 존재하지만 만료된 경우, 만료 처리 후 예외를 반환한다.
-        if (activePayment != null) {
-            activePayment.expire();
-            paymentRepository.save(activePayment);
-            log.warn("[Payment] 만료된 결제 감지 orderId={}, paymentId={}", orderId, activePayment.getId());
-            throw new PaymentExpiredException(orderId, activePayment.getId());
-        }
-
-        log.error("[Payment] order 는 EXECUTING 이지만 활성 Payment 가 없습니다. 강제 복구를 시도합니다. orderId={}",
-            orderId);
-        orderClient.updatePendingOrder(orderId);
-        throw new PaymentRecoveryRequiredException(orderId);
-    }
-
-    /**
-     * 주문 정보 기준으로 새 결제를 생성한다.
-     *
-     * 의도:
-     * 결제 생성 규칙을 한곳에 두고, 생성 시각과 만료 시각을 함께 기록한다.
-     */
     private PaymentResponse createNewPayment(OrderSummary order) {
         LocalDateTime createdAt = LocalDateTime.now();
         Payment payment = Payment.builder()
             .id(snowflakeIdGenerator.nextId())
             .orderId(order.orderId())
-            .amount(order.totalAmount())
             .status(PaymentStatus.NOT_STARTED)
+            .amount(order.totalAmount())
             .createdAt(createdAt)
             .expiresAt(createdAt.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
             .build();
 
-        log.info("[Payment] 결제 객체 생성 orderId={}, paymentId={}",
-            payment.getOrderId(), payment.getId());
-
-        Payment savedPayment = paymentRepository.save(payment);
-
-        log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", order.orderId(), savedPayment.getId());
-        return PaymentResponse.from(savedPayment);
+        try {
+            return PaymentResponse.from(paymentRepository.save(payment));
+        } catch (DataIntegrityViolationException exception) {
+            return resolveAlreadyExecutingPayment(order.orderId());
+        }
     }
 
-    /**
-     * 주문 id에 해당하는 결제를 생성하여 반환한다.
-     *
-     * @param request
-     * @return psp 결제 URL
-     *
-     * // @Transactional : order server에 요청을 보내므로, 트랜잭션을 처리하지 않았습니다. DB 커넥션을 잡지 않기 위함입니다.
-     */
-    public PaymentResponse createPaymentWithUniqueKey(CreatePaymentRequest request) {
-        log.info("[Payment] 결제 생성 orderId={}", request.orderId());
+    private PaymentResponse resolveAlreadyExecutingPayment(Long orderId) {
+        List<Payment> activePayments = paymentRepository.findAllByOrderIdAndStatusIn(orderId, ACTIVE_PAYMENT_STATUSES);
 
-        OrderSummary order;
-        try {
-            order = orderClient.updateExecutingStatus(request.orderId());
-        } catch (RuntimeException exception) {
-            throw new PaymentOrderLookupException(request.orderId(), exception);
+        if (activePayments.size() > 1) {
+            throw new PaymentException("[Payment] 처리 중인 결제가 2개 이상 존재합니다. orderId=" + orderId);
         }
 
-        log.info("[Payment] 주문 상태 EXECUTING 갱신 완료 = {}", order.orderId());
-
-        LocalDateTime createdAt = LocalDateTime.now();
-        Payment payment = Payment.builder()
-            .id(snowflakeIdGenerator.nextId())
-            .orderId(order.orderId())
-            .amount(order.totalAmount())
-            .status(PaymentStatus.NOT_STARTED)
-            .createdAt(createdAt)
-            .expiresAt(createdAt.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
-            .build();
-
-        log.info("[Payment] 결제 객체 생성 orderId={}", payment.getId());
-
-        try {
-            Payment savedPayment = paymentRepository.save(payment);
-            log.info("[Payment] 결제 Entity 생성 주문번호={}, id={}", request.orderId(), savedPayment.getId());
-            return PaymentResponse.from(savedPayment);
-        } catch (DataIntegrityViolationException e) {
-            // UNIQUE 제약조건 위반 등 데이터 무결성 오류 발생 시 커스텀 예외로 전환
-            log.warn("[Payment] 결제 Entity 중복 생성 orderId={}", payment.getOrderId());
-            throw new DuplicatePaymentException(request.orderId());
+        if (activePayments.isEmpty()) {
+            orderClient.updatePendingOrder(orderId);
+            throw new PaymentRecoveryRequiredException(orderId);
         }
+
+        Payment payment = activePayments.get(0);
+        if (payment.isExpired(LocalDateTime.now())) {
+            payment.expire();
+            paymentRepository.save(payment);
+            throw new PaymentExpiredException(orderId, payment.getId());
+        }
+
+        return PaymentResponse.from(payment);
     }
 
     /**

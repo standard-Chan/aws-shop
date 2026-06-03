@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import jeong.awsshop.payment.exception.PaymentAmountMismatchException;
@@ -20,7 +21,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "payment")
+@Table(
+    name = "payment",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payment_order_id", columnNames = "order_id")
+    }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -31,6 +37,7 @@ public class Payment {
     private Long id;
 
     // 결제할 주문 정보
+    @Column(name = "order_id", nullable = false)
     private Long orderId;
 
     // toss 결제 고유 키 (결제 승인 요청, 환불, 취소 시 필요)
