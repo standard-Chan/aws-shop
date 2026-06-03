@@ -206,6 +206,7 @@ docker compose up -d kafka
 환경 변수로 topic과 bootstrap server를 바꿀 수 있다.
 
 ```properties
+ANALYTICS_KAFKA_ENABLED=true
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ANALYTICS_TOPIC_SEARCH=search-events
 ANALYTICS_TOPIC_PRODUCT_VIEW=product-view-events
@@ -213,6 +214,9 @@ ANALYTICS_TOPIC_CART=cart-events
 ANALYTICS_TOPIC_PURCHASE=purchase-events
 ANALYTICS_CONSUMER_GROUP_ID=analytics-event-consumer-group
 ```
+
+`ANALYTICS_KAFKA_ENABLED=false`로 설정하면 Kafka Producer/Consumer를 비활성화한다.
+이때 Analytics 이벤트 수집 API는 이벤트 ID를 생성해 `202 Accepted`를 반환하지만 Kafka 발행과 Consumer 저장은 수행하지 않는다.
 
 ## Funnel Analysis
 

@@ -41,6 +41,7 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
   analytics:
     kafka:
+      enabled: ${ANALYTICS_KAFKA_ENABLED:false}
       topics:
         search: ${ANALYTICS_TOPIC_SEARCH:search-events}
         product-view: ${ANALYTICS_TOPIC_PRODUCT_VIEW:product-view-events}

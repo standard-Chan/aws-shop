@@ -3,6 +3,7 @@ package jeong.awsshop.analytics.infrastructure;
 import jeong.awsshop.analytics.application.AnalyticsEventStoreService;
 import jeong.awsshop.analytics.domain.AnalyticsEventMessage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.analytics.kafka.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaAnalyticsEventConsumer {
 
     private final AnalyticsEventStoreService analyticsEventStoreService;
