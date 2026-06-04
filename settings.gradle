@@ -1,1 +1,6 @@
 rootProject.name = 'aws-shop'
+
+include 'event-pipeline:common'
+include 'event-pipeline:producer-api'
+include 'event-pipeline:db-consumer'
+include 'event-pipeline:hadoop-consumer'

@@ -38,6 +38,8 @@ out/
 
 ## env
 .env
+event-pipeline/.env
+event-pipeline/.env.local
 
 ## dataset file
 aws-dataset/failed-products

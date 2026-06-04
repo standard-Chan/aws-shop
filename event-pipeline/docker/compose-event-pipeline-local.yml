@@ -1,0 +1,87 @@
+services:
+  # Kafka KRaft 단일 broker
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: aws-shop-event-kafka-local
+    # Host Kafka bootstrap 포트
+    ports:
+      - "19092:19092"
+    environment:
+      # Kafka node 식별자
+      KAFKA_NODE_ID: 1
+      # Broker와 Controller 통합 실행 역할
+      KAFKA_PROCESS_ROLES: broker,controller
+      # 단일 node controller quorum 구성
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # 내부 broker listener, controller listener, host 접근 listener
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      # 컨테이너 내부 접근 주소와 host 접근 주소
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092
+      # Controller 전용 listener 이름
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listener별 보안 프로토콜 매핑
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      # Broker 간 통신 listener 이름
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Consumer offset topic 복제 계수
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Transaction state topic 복제 계수
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      # Transaction state topic 최소 ISR
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Consumer group 초기 rebalance 지연 시간
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  # Elasticsearch 단일 노드
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: aws-shop-event-elasticsearch-local
+    # Host Elasticsearch HTTP 포트
+    ports:
+      - "19200:9200"
+    environment:
+      # 단일 노드 discovery 모드
+      discovery.type: single-node
+      # 로컬 개발용 보안 비활성화
+      xpack.security.enabled: "false"
+      # Elasticsearch JVM heap 크기
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+
+  # Kafka Connect 분산 worker
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.6.1
+    container_name: aws-shop-event-kafka-connect-local
+    # Kafka broker와 Elasticsearch 시작 의존성
+    depends_on:
+      - kafka
+      - elasticsearch
+    # Host Kafka Connect REST 포트
+    ports:
+      - "18083:8083"
+    environment:
+      # Connect worker Kafka bootstrap server 목록
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      # Connect REST 광고 hostname
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      # Connect 클러스터 group id
+      CONNECT_GROUP_ID: aws-shop-event-connect-local
+      # Connector config 저장 topic
+      CONNECT_CONFIG_STORAGE_TOPIC: aws-shop-event-connect-configs
+      # Connector offset 저장 topic
+      CONNECT_OFFSET_STORAGE_TOPIC: aws-shop-event-connect-offsets
+      # Connector status 저장 topic
+      CONNECT_STATUS_STORAGE_TOPIC: aws-shop-event-connect-status
+      # Config topic 복제 계수
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      # Offset topic 복제 계수
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      # Status topic 복제 계수
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # Kafka record key 변환기
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      # Kafka record value 변환기
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      # Schema 없는 JSON value 변환
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      # Connector plugin 탐색 경로
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components

@@ -1,0 +1,52 @@
+// Spring Boot Hadoop Consumer 서버 플러그인
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+// event-pipeline Hadoop Consumer 모듈 좌표
+group = 'jeong'
+version = '1.2.1'
+
+// Java 21 toolchain
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Maven Central 의존성 저장소
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 사용자 행동 이벤트 메시지 공통 모듈
+    implementation project(':event-pipeline:common')
+
+    // 비웹 Spring Boot 실행 의존성
+    implementation 'org.springframework.boot:spring-boot-starter'
+
+    // Kafka Consumer 의존성
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // JSONL 파일 직렬화 의존성
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // Spring Boot 테스트 의존성
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // JUnit Platform 런처
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// JUnit Platform 테스트 실행
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Java 컴파일 UTF-8 인코딩
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}

@@ -1,0 +1,36 @@
+spring:
+  # 애플리케이션 이름
+  application:
+    name: event-producer-api
+  # 환경변수 파일 import 경로
+  config:
+    import:
+      - optional:file:event-pipeline/.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+  # Kafka Producer 설정
+  kafka:
+    # Kafka bootstrap server 목록
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092,localhost:19093,localhost:19094}
+    producer:
+      # Kafka record key 직렬화 방식
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Kafka record value JSON 직렬화 방식
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # 전체 ISR 복제 확인 ack 모드
+      acks: all
+      properties:
+        # JSON type header 비활성화
+        spring.json.add.type.headers: false
+
+server:
+  # Producer API HTTP 포트
+  port: ${EVENT_PRODUCER_PORT:18081}
+
+event-pipeline:
+  # 사용자 행동 이벤트 타입별 Kafka topic 이름
+  topics:
+    search: ${EVENT_TOPIC_SEARCH:search-events}
+    product-view: ${EVENT_TOPIC_PRODUCT_VIEW:product-view-events}
+    cart: ${EVENT_TOPIC_CART:cart-events}
+    purchase: ${EVENT_TOPIC_PURCHASE:purchase-events}

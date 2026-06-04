@@ -1,0 +1,25 @@
+// Java 라이브러리 모듈 플러그인
+plugins {
+    id 'java-library'
+}
+
+// event-pipeline 공통 모듈 좌표
+group = 'jeong'
+version = '1.2.1'
+
+// Java 21 toolchain
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Maven Central 의존성 저장소
+repositories {
+    mavenCentral()
+}
+
+// Java 컴파일 UTF-8 인코딩
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
