@@ -17,7 +17,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       # Kafka record value JSON 직렬화 방식
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      # 전체 ISR 복제 확인 ack 모드
+      # 전체 ISR 복제 확인 ack 모드.  추후 성능에 따라 유실 허용 비교 처리 필요
       acks: all
       properties:
         # JSON type header 비활성화
@@ -28,6 +28,9 @@ server:
   port: ${EVENT_PRODUCER_PORT:18081}
 
 event-pipeline:
+  # Producer 인스턴스 Snowflake node id
+  producer:
+    node-id: ${EVENT_PRODUCER_NODE_ID:1}
   # 사용자 행동 이벤트 타입별 Kafka topic 이름
   topics:
     search: ${EVENT_TOPIC_SEARCH:search-events}
