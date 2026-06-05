@@ -33,6 +33,7 @@ dependencies {
 
     // JSONL 파일 직렬화 의존성
     implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
     // Spring Boot 테스트 의존성
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
