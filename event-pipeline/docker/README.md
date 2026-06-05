@@ -36,6 +36,9 @@ docker compose -f event-pipeline/docker/compose-event-pipeline.yml down
 - Kafka 3 broker bootstrap: `localhost:19092,localhost:19093,localhost:19094`
 - Elasticsearch: `http://localhost:19200`
 - Kafka Connect REST API: `http://localhost:18083`
+- Producer API: `http://localhost:18081`
+- DB Consumer: `http://localhost:18082`
+- Hadoop Consumer: `http://localhost:18084`
 
 ## Kafka Connect Connector
 

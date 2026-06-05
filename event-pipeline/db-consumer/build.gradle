@@ -31,6 +31,9 @@ dependencies {
     // Kafka Consumer 의존성
     implementation 'org.springframework.kafka:spring-kafka'
 
+    // Java time 타입 Kafka JSON 역직렬화 의존성
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
     // MySQL 런타임 드라이버
     runtimeOnly 'com.mysql:mysql-connector-j'
 

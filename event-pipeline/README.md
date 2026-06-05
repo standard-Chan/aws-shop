@@ -23,6 +23,7 @@ docker compose -f event-pipeline/docker/compose-event-pipeline-local.yml up -d
 ```
 
 Producer API 기본 포트는 `18081`이다.
+DB Consumer 기본 포트는 `18082`, Hadoop Consumer 기본 포트는 `18084`다. 두 Consumer는 현재 비웹 실행 모드라 포트를 열지 않는다.
 
 ```bash
 curl -X POST http://localhost:18081/api/event-pipeline/events/search \

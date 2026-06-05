@@ -1,4 +1,4 @@
-package jeong.awsshop.eventpipeline.hadoopconsumer;
+package jeong.awsshop.eventpipeline.dbconsumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -11,14 +11,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 @Configuration
-public class EventHadoopConsumerKafkaConfig {
+public class EventDbConsumerKafkaConfig {
 
     @Bean
     @ConditionalOnMissingBean
@@ -44,21 +43,5 @@ public class EventHadoopConsumerKafkaConfig {
                 new StringDeserializer(),
                 new ErrorHandlingDeserializer<>(valueDeserializer)
         );
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, UserBehaviorEventMessage>
-    batchKafkaListenerContainerFactory(
-        ConsumerFactory<String, UserBehaviorEventMessage> consumerFactory
-    ) {
-
-        ConcurrentKafkaListenerContainerFactory<String, UserBehaviorEventMessage> factory =
-            new ConcurrentKafkaListenerContainerFactory<>();
-
-        factory.setConsumerFactory(consumerFactory);
-
-        factory.setBatchListener(true);
-
-        return factory;
     }
 }

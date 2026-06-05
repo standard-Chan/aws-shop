@@ -49,6 +49,8 @@ aws-dataset/reviews
 
 aws-dataset/*.json
 
+# 부산물
 logs/
 docs/
 k6/results
+tmp/
