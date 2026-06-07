@@ -9,12 +9,14 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
-import jeong.awsshop.eventpipeline.monolith.domain.UserBehaviorEventSink;
+import jeong.awsshop.eventpipeline.monolith.domain.UserBehaviorEventStorage;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-public class UserBehaviorEventFileSink implements UserBehaviorEventSink {
+@Order(10)
+public class UserBehaviorEventFileSink implements UserBehaviorEventStorage {
 
     private static final OpenOption[] APPEND_OPTIONS = {
             StandardOpenOption.CREATE,

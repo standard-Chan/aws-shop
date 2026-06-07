@@ -15,3 +15,7 @@ event-pipeline:
     node-id: ${EVENT_MONOLITH_NODE_ID:1}
     hadoop:
       output-path: ${EVENT_MONOLITH_HADOOP_OUTPUT_PATH:/tmp/aws-shop-event-pipeline/monolith-user-behavior-events.jsonl}
+    elasticsearch:
+      enabled: ${EVENT_MONOLITH_ES_ENABLED:true}
+      base-url: ${EVENT_MONOLITH_ES_BASE_URL:http://localhost:19200}
+      index-name: ${EVENT_MONOLITH_ES_INDEX_NAME:user-behavior-events}
