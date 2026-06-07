@@ -4,3 +4,5 @@ include 'event-pipeline:common'
 include 'event-pipeline:producer-api'
 include 'event-pipeline:db-consumer'
 include 'event-pipeline:hadoop-consumer'
+
+include 'event-pipeline:monolith-api'

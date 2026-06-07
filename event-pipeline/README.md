@@ -6,6 +6,7 @@
 
 - `common`: 이벤트 메시지와 이벤트 타입 공통 라이브러리. 직접 실행하지 않는다.
 - `producer-api`: 사용자 행동 이벤트를 HTTP로 받고 Kafka에 발행하는 서버.
+- `monolith-api`: 사용자 행동 이벤트를 HTTP로 받고 내부 sink에 저장을 위임하는 모놀리스 시작점. Kafka를 사용하지 않는다.
 - `db-consumer`: Kafka 이벤트를 구독해서 DB에 저장하는 consumer 서버.
 - `hadoop-consumer`: Kafka 이벤트를 구독해서 Hadoop 적재 전 단계의 JSONL 파일로 저장하는 consumer 서버.
 - `kafka-connect`: Elasticsearch Sink Connector 등록 설정.
@@ -26,6 +27,18 @@ Producer API 기본 포트는 `18081`이다.
 
 ```bash
 curl -X POST http://localhost:18081/api/event-pipeline/events/search \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":1,"keyword":"macbook"}'
+```
+
+Monolith API 기본 포트는 `18082`다. Kafka, Elasticsearch, Hadoop 없이 HTTP 요청 수집과 이벤트 생성까지만 수행한다.
+
+```bash
+./gradlew :event-pipeline:monolith-api:bootRun
+```
+
+```bash
+curl -X POST http://localhost:18082/api/event-pipeline/events/search \
   -H 'Content-Type: application/json' \
   -d '{"userId":1,"keyword":"macbook"}'
 ```
