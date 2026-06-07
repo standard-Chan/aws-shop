@@ -8,8 +8,10 @@ spring:
       - optional:file:.env[.properties]
 
 server:
-  port: ${EVENT_MONOLITH_PORT:18082}
+  port: ${EVENT_MONOLITH_PORT:18081}
 
 event-pipeline:
   monolith:
     node-id: ${EVENT_MONOLITH_NODE_ID:1}
+    hadoop:
+      output-path: ${EVENT_MONOLITH_HADOOP_OUTPUT_PATH:/tmp/aws-shop-event-pipeline/monolith-user-behavior-events.jsonl}
