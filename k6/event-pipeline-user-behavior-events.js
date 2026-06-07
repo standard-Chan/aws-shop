@@ -3,10 +3,8 @@ import { check } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:18081';
-const TPS = Number(__ENV.TPS || 1000);
 const DURATION = __ENV.DURATION || '1m';
 const PRE_ALLOCATED_VUS = Number(__ENV.PRE_ALLOCATED_VUS || 200);
-const MAX_VUS = Number(__ENV.MAX_VUS || 1000);
 const USER_ID_MIN = Number(__ENV.USER_ID_MIN || 1);
 const USER_ID_RANGE = Number(__ENV.USER_ID_RANGE || 100000);
 const PRODUCT_ID_MIN = Number(__ENV.PRODUCT_ID_MIN || 1);
@@ -16,6 +14,10 @@ const KEYWORDS = (__ENV.KEYWORDS || 'macbook,keyboard,monitor,mouse,notebook')
   .split(',')
   .map((value) => value.trim())
   .filter((value) => value.length > 0);
+
+const TPS = Number(__ENV.TPS || 1000);
+const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || '3s';
+const MAX_VUS = Number(__ENV.MAX_VUS || 6000);
 
 export const acceptedEvents = new Counter('event_pipeline_accepted_events');
 export const failedEvents = new Counter('event_pipeline_failed_events');
@@ -39,6 +41,8 @@ export const options = {
   thresholds: {
     event_pipeline_failed_events: ['count==0'],
     event_pipeline_success_rate: ['rate==1'],
+    http_req_duration: ['p(95)<1000', 'p(99)<3000'],
+    dropped_iterations: ['count==0'],
   },
   summaryTrendStats: ['avg', 'min', 'med', 'p(95)', 'p(99)', 'max'],
 };
@@ -46,7 +50,7 @@ export const options = {
 const eventCases = [
   {
     name: 'SEARCH',
-    path: '/api/event-pipeline/async-hadoop/events/search',
+    path: '/api/event-pipeline/events/search',
     acceptedCounter: searchAccepted,
     body: (sequence) => ({
       userId: userIdOf(sequence),
@@ -55,7 +59,7 @@ const eventCases = [
   },
   {
     name: 'PRODUCT_VIEW',
-    path: '/api/event-pipeline/async-hadoop/events/product-view',
+    path: '/api/event-pipeline/events/product-view',
     acceptedCounter: productViewAccepted,
     body: (sequence) => ({
       userId: userIdOf(sequence),
@@ -66,7 +70,7 @@ const eventCases = [
   },
   {
     name: 'ADD_TO_CART',
-    path: '/api/event-pipeline/async-hadoop/events/add-to-cart',
+    path: '/api/event-pipeline/events/add-to-cart',
     acceptedCounter: addToCartAccepted,
     body: (sequence) => ({
       userId: userIdOf(sequence),
@@ -75,7 +79,7 @@ const eventCases = [
   },
   {
     name: 'PURCHASE',
-    path: '/api/event-pipeline/async-hadoop/events/purchase',
+    path: '/api/event-pipeline/events/purchase',
     acceptedCounter: purchaseAccepted,
     body: (sequence) => ({
       userId: userIdOf(sequence),
@@ -91,6 +95,7 @@ export default function () {
     `${BASE_URL}${eventCase.path}`,
     JSON.stringify(eventCase.body(sequence)),
     {
+      timeout: REQUEST_TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
       },
