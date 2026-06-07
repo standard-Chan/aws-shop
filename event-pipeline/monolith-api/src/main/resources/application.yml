@@ -13,6 +13,9 @@ server:
 event-pipeline:
   monolith:
     node-id: ${EVENT_MONOLITH_NODE_ID:1}
+    batch:
+      size: ${EVENT_MONOLITH_BATCH_SIZE:10000}
+      flush-interval-millis: ${EVENT_MONOLITH_BATCH_FLUSH_INTERVAL_MILLIS:1000}
     hadoop:
       output-path: ${EVENT_MONOLITH_HADOOP_OUTPUT_PATH:/tmp/aws-shop-event-pipeline/monolith-user-behavior-events.jsonl}
     elasticsearch:

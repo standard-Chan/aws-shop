@@ -18,6 +18,11 @@ repositories {
 }
 
 dependencies {
+
+    // Lombok 의존성 추가
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
     implementation project(':event-pipeline:common')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
