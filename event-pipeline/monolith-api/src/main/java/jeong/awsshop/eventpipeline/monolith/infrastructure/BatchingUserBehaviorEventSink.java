@@ -31,9 +31,9 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
      * HTTP 요청 thread와 저장 worker thread 사이의 경계다.
      *
      * 의도:
-     * - 요청 thread는 외부 I/O(HDFS/ES)를 기다리지 않고 queue에 넣은 뒤 바로 202를 반환한다.
-     * - LinkedBlockingQueue는 여러 요청 thread가 동시에 save를 호출해도 안전하다.
-     * - 실제 저장은 아래 executor의 단일 worker가 batch 단위로 처리한다.
+     * - 최대한 많은 요청을 처리하기 위해 batch 처리로 효율을 높였다.
+     * - 요청 thread는 외부 I/O(HDFS/ES 응답)를 기다리지 않고 queue에 넣은 뒤 바로 202를 반환한다.
+     * - 실제 저장 및 요청 전송은 executor의 단일 worker가 batch 단위로 처리한다.
      */
     private final BlockingQueue<UserBehaviorEventMessage> queue = new LinkedBlockingQueue<>(100000);
 
@@ -53,24 +53,17 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
 
     /*
      * JSON 변환은 여기에서 한 번만 수행한다.
-     *
-     * File sink와 Elasticsearch sink가 각각 ObjectMapper로 다시 변환하면
-     * 저장소마다 JSON 표현이 달라질 수 있고 비용도 중복된다.
-     * 그래서 batch writer가 공통 JSON 문자열을 만들고, downstream storage는 그 문자열을 그대로 쓴다.
      */
     private final ObjectMapper objectMapper;
 
     /*
      * 실제 저장 대상들이다.
-     * 현재는 Hadoop staging 파일 sink와 Elasticsearch bulk sink가 들어온다.
+     * 현재 : Hadoop staging 파일 sink와 Elasticsearch bulk sink가 들어온다.
      * Spring @Order 값에 따라 파일 저장(10), ES 저장(20) 순서로 호출된다.
      */
     private final List<UserBehaviorEventStorage> storages;
 
-    /*
-     * 저장 I/O 전담 worker다.
-     * 단일 thread를 쓰는 이유는 batch drain과 저장 순서를 단순하게 유지하기 위해서다.
-     */
+    // 저장 I/O worker
     private final ScheduledExecutorService executor;
 
     /*
@@ -98,10 +91,7 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
         );
     }
 
-    /*
-     * 테스트 전용 생성자다.
-     * 운영 코드에서는 직접 ScheduledExecutorService를 만들지만, 테스트에서는 제어 가능한 executor를 넣는다.
-     */
+    // 테스트 전용 생성자
     BatchingUserBehaviorEventSink(
             int batchSize,
             long flushIntervalMillis,
@@ -124,12 +114,7 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
 
     @PostConstruct
     public void start() {
-        /*
-         * tick 기반 flush다.
-         *
-         * 트래픽이 적으면 batchSize까지 영원히 못 채울 수 있다.
-         * 그래서 일정 시간마다 queue를 확인해, 적은 개수라도 저장소로 밀어낸다.
-         */
+        // 일정 시간마다 저장소로 밀어낸다.
         executor.scheduleWithFixedDelay(
                 this::flushSafely,
                 flushIntervalMillis,
@@ -148,29 +133,20 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
         executor.shutdown();
     }
 
+    // 외부 IO, HTTP 호출은 이 요청 thread에서 하지 않는다. 즉시 성공을 반환한다.
     @Override
     public void save(UserBehaviorEventMessage event) {
-        /*
-         * 요청 흐름의 핵심이다.
-         *
-         * 여기서는 queue.add만 수행하므로 보통 매우 빠르게 끝난다.
-         * HDFS 파일 쓰기나 ES HTTP 호출은 이 요청 thread에서 하지 않는다.
-         */
         queue.add(event);
+
         if (queue.size() >= batchSize) {
-            /*
-             * batch 크기가 찼다면 즉시 flush 작업을 예약한다.
-             * flushSafely 내부 guard가 있으므로 여러 요청이 동시에 이 분기를 타도 실제 flush는 하나씩만 실행된다.
-             */
+            // batch 크기가 찼다면 flush 작업을 예약한다.
+            // flushSafely 내부 guard가 있으므로 여러 요청이 동시에 이 분기를 타도 실제 flush는 하나씩만 실행된다.
             executor.execute(this::flushSafely);
         }
     }
 
     void flushSafely() {
-        /*
-         * 이미 다른 flush가 돌고 있으면 이번 호출은 빠져나간다.
-         * queue에 남은 이벤트는 진행 중인 flush 또는 다음 tick에서 처리된다.
-         */
+        // 락 (이미 처리중이면 pass 한다)
         if (!flushing.compareAndSet(false, true)) {
             return;
         }
@@ -188,10 +164,7 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
     }
 
     private void flushAvailable() {
-        /*
-         * 현재 queue에 쌓인 이벤트를 batchSize 단위로 비운다.
-         * flush 중 새 이벤트가 들어올 수 있으므로 queue가 빌 때까지 반복한다.
-         */
+        // 현재 queue에 쌓인 이벤트를 batchSize 단위로 비운다.
         while (!queue.isEmpty()) {
             List<UserBehaviorEventMessage> batch = drainBatch();
             if (batch.isEmpty()) {
@@ -199,31 +172,33 @@ public class BatchingUserBehaviorEventSink implements UserBehaviorEventSink {
             }
             List<SerializedUserBehaviorEvent> serializedEvents = serialize(batch);
             for (UserBehaviorEventStorage storage : storages) {
-                /*
-                 * 같은 serializedEvents를 모든 저장소에 전달한다.
-                 * 이 지점부터 저장소별 책임은 "이미 만들어진 JSON을 어디에 어떻게 쓸 것인가"로 제한된다.
-                 */
+                // 각 저장소에 batch 단위로 저장/전달한다.
                 storage.saveAll(serializedEvents);
             }
         }
     }
 
+    /**
+     * batch 단위로 queue에서 이벤트를 꺼낸다
+     */
     private List<UserBehaviorEventMessage> drainBatch() {
         List<UserBehaviorEventMessage> batch = new ArrayList<>(batchSize);
-        /*
-         * drainTo는 queue에서 최대 batchSize개를 원자적으로 꺼낸다.
-         * 개별 poll 반복보다 의도가 명확하고 lock 횟수도 줄일 수 있다.
-         */
         queue.drainTo(batch, batchSize);
         return batch;
     }
 
+    /**
+     * 외부 저장소에 전달할 때, 사용하는 공통 데이터 포맷의 batch로 변환한다.
+     */
     private List<SerializedUserBehaviorEvent> serialize(List<UserBehaviorEventMessage> batch) {
         return batch.stream()
                 .map(this::serialize)
                 .toList();
     }
 
+    /**
+     * 외부 저장소에 전달할 때, 사용하는 공통 데이터 포맷으로 변환한다.
+     */
     private SerializedUserBehaviorEvent serialize(UserBehaviorEventMessage event) {
         try {
             return new SerializedUserBehaviorEvent(event.eventId(), objectMapper.writeValueAsString(event));

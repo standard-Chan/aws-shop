@@ -85,6 +85,10 @@ public class UserBehaviorEventService {
         return EventAcceptedResponse.from(event);
     }
 
+    /**
+     * UserBehaviorEventMessage를 UserBehaviorEventSink에 저장한다.
+     * @param event
+     */
     private void save(UserBehaviorEventMessage event) {
         eventSink.save(event);
     }

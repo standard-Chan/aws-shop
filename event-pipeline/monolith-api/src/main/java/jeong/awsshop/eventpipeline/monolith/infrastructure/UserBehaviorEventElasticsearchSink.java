@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-@Component
+//@Component
 @Order(20)
 @ConditionalOnProperty(
         name = "event-pipeline.monolith.elasticsearch.enabled",
@@ -65,18 +65,14 @@ public class UserBehaviorEventElasticsearchSink implements UserBehaviorEventStor
         log.info("Starting ES bulk request. Event count: {}", eventCount);
 
         try {
-            /*
-             * batch마다 단건 PUT을 반복하지 않고 ES _bulk API 한 번으로 저장한다.
-             * _id를 eventId로 고정해 같은 이벤트가 재처리되더라도 같은 문서를 덮어쓰게 한다.
-             */
             restClient.post()
                 .uri("/_bulk")
                 .contentType(NDJSON)
                 .body(toBulkRequestBody(events))
                 .retrieve()
-                .toBodilessEntity(); // 💡 여기서 응답이 올 때까지 스레드가 대기(Blocking)합니다.
+                .toBodilessEntity(); // 응답이 올 때까지 스레드 대기(Blocking)
 
-            // ⏱️ 응답이 도착한 후 걸린 시간 계산
+            // 응답이 도착한 후 걸린 시간 계산
             long duration = System.currentTimeMillis() - startTime;
             log.info("Successfully saved user behavior events to ES. Event count: {}, Took: {}ms", eventCount, duration);
 
@@ -91,13 +87,12 @@ public class UserBehaviorEventElasticsearchSink implements UserBehaviorEventStor
         }
     }
 
+    /**
+     * ES Bulk API에 맞는 요청 body를 만든다.
+     */
     private String toBulkRequestBody(List<SerializedUserBehaviorEvent> events) {
         StringBuilder builder = new StringBuilder();
         for (SerializedUserBehaviorEvent event : events) {
-            /*
-             * Bulk API는 "명령 줄(action line)"과 "문서 줄(source line)"이 한 쌍이다.
-             * event.json()은 BatchingUserBehaviorEventSink에서 공통으로 만든 문서 JSON이다.
-             */
             builder.append(toBulkActionLine(event)).append('\n');
             builder.append(event.json()).append('\n');
         }

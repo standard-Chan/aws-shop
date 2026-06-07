@@ -37,16 +37,17 @@ public class UserBehaviorEventFileSink implements UserBehaviorEventStorage {
         this.outputPath = outputPath;
     }
 
+    /**
+     * batch 단위로 file에 append하여 저장한다.
+     * 동시 접근을 막기 위해서 synchronized로 메서드로 처리한다.
+     * @param events
+     */
     @Override
     public synchronized void saveAll(List<SerializedUserBehaviorEvent> events) {
         if (events.isEmpty()) {
             return;
         }
         try {
-            /*
-             * 여러 batch flush가 겹치지 않도록 BatchingUserBehaviorEventSink에서도 막고 있지만,
-             * 파일 append는 깨지면 복구가 어렵기 때문에 한 번 더 synchronized로 보호한다.
-             */
             createParentDirectories();
             Files.writeString(outputPath, toJsonLines(events), StandardCharsets.UTF_8, APPEND_OPTIONS);
         } catch (IOException exception) {
@@ -64,10 +65,6 @@ public class UserBehaviorEventFileSink implements UserBehaviorEventStorage {
     private String toJsonLines(List<SerializedUserBehaviorEvent> events) {
         StringBuilder builder = new StringBuilder();
         for (SerializedUserBehaviorEvent event : events) {
-            /*
-             * 이미 공통 직렬화된 JSON을 그대로 한 줄로 쓴다.
-             * 저장소마다 JSON 변환을 다시 하지 않는 것이 이 batch 구조의 의도다.
-             */
             builder.append(event.json()).append(System.lineSeparator());
         }
         return builder.toString();
