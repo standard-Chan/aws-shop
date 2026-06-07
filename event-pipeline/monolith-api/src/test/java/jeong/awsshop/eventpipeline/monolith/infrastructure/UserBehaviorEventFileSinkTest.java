@@ -2,13 +2,10 @@ package jeong.awsshop.eventpipeline.monolith.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
-import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
-import jeong.awsshop.eventpipeline.common.UserBehaviorEventType;
+import jeong.awsshop.eventpipeline.monolith.domain.SerializedUserBehaviorEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,29 +18,22 @@ class UserBehaviorEventFileSinkTest {
     @Test
     @DisplayName("사용자 행동 이벤트를 Hadoop staging용 JSONL 파일에 append해야 한다")
     void shouldAppendUserBehaviorEventAsJsonLine() throws Exception {
-        ObjectMapper objectMapper = new EventMonolithJsonConfig().objectMapper();
         Path outputPath = tempDir.resolve("staging/user-behavior-events.jsonl");
-        UserBehaviorEventFileSink fileSink = new UserBehaviorEventFileSink(outputPath, objectMapper);
+        UserBehaviorEventFileSink fileSink = new UserBehaviorEventFileSink(outputPath);
 
-        fileSink.save(UserBehaviorEventMessage.newMessage(
-                1L,
-                UserBehaviorEventType.SEARCH,
-                10L,
-                Instant.parse("2026-06-05T05:22:58.600Z"),
-                "keyboard",
-                null,
-                null,
-                null
-        ));
-        fileSink.save(UserBehaviorEventMessage.newMessage(
-                2L,
-                UserBehaviorEventType.ADD_TO_CART,
-                10L,
-                Instant.parse("2026-06-05T05:23:10Z"),
-                null,
-                100L,
-                null,
-                null
+        fileSink.saveAll(List.of(
+                new SerializedUserBehaviorEvent(
+                        1L,
+                        """
+                                {"eventId":1,"eventType":"SEARCH","userId":10,"occurredAt":"2026-06-05T05:22:58.600Z","keyword":"keyboard"}
+                                """.trim()
+                ),
+                new SerializedUserBehaviorEvent(
+                        2L,
+                        """
+                                {"eventId":2,"eventType":"ADD_TO_CART","userId":10,"occurredAt":"2026-06-05T05:23:10Z","productId":100}
+                                """.trim()
+                )
         ));
 
         List<String> jsonLines = Files.readAllLines(outputPath);
