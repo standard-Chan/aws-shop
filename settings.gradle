@@ -6,3 +6,4 @@ include 'event-pipeline:db-consumer'
 include 'event-pipeline:hadoop-consumer'
 
 include 'event-pipeline:monolith-api'
+include 'event-pipeline:product-ranking'

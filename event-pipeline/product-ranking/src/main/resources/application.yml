@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: event-product-ranking
+  config:
+    import:
+      - optional:file:event-pipeline/.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+
+server:
+  port: ${EVENT_PRODUCT_RANKING_PORT:18083}
