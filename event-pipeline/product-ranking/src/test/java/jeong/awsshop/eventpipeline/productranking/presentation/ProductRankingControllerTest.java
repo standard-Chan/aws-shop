@@ -12,6 +12,7 @@ import java.util.List;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.application.ProductRankingService;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
+import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,15 +53,16 @@ class ProductRankingControllerTest {
     }
 
     @Test
-    @DisplayName("실시간 상품 랭킹을 조회해야 한다")
+    @DisplayName("시간 윈도우 기준 상품 랭킹을 조회해야 한다")
     void should_get_product_rankings() throws Exception {
-        when(productRankingService.findTop(2))
+        when(productRankingService.findTop(RankingWindow.ONE_DAY, 2))
                 .thenReturn(List.of(
                         new ProductRankingItem(1L, 100L, 14L),
                         new ProductRankingItem(2L, 200L, 3L)
                 ));
 
         mockMvc.perform(get("/api/event-pipeline/product-ranking/rankings")
+                        .param("window", "ONE_DAY")
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].rank").value(1L))
@@ -70,6 +72,18 @@ class ProductRankingControllerTest {
                 .andExpect(jsonPath("$[1].productId").value(200L))
                 .andExpect(jsonPath("$[1].score").value(3L));
 
-        verify(productRankingService).findTop(2);
+        verify(productRankingService).findTop(RankingWindow.ONE_DAY, 2);
+    }
+
+    @Test
+    @DisplayName("window 파라미터를 생략하면 1시간 랭킹을 조회해야 한다")
+    void should_get_one_hour_rankings_by_default() throws Exception {
+        when(productRankingService.findTop(RankingWindow.ONE_HOUR, 10))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/event-pipeline/product-ranking/rankings"))
+                .andExpect(status().isOk());
+
+        verify(productRankingService).findTop(RankingWindow.ONE_HOUR, 10);
     }
 }
