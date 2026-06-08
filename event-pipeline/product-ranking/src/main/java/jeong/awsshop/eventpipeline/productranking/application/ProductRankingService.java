@@ -1,8 +1,10 @@
 package jeong.awsshop.eventpipeline.productranking.application;
 
 import java.util.List;
+import java.util.concurrent.atomic.LongAdder;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
+import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingMemoryStats;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import org.springframework.stereotype.Service;
 
@@ -16,12 +18,15 @@ public class ProductRankingService {
     // private static final long PURCHASE_SCORE = 30L;
 
     private final ProductRankingStore productRankingStore;
+    private final LongAdder processedEventCount = new LongAdder();
 
     public ProductRankingService(ProductRankingStore productRankingStore) {
         this.productRankingStore = productRankingStore;
     }
 
     public void record(UserBehaviorEventMessage event) {
+        processedEventCount.increment();
+
         Long productId = event.productId();
         if (productId == null) {
             return;
@@ -45,5 +50,24 @@ public class ProductRankingService {
 
     public List<ProductRankingItem> findTop(int limit) {
         return productRankingStore.findTop(limit);
+    }
+
+    public long processedEventCount() {
+        return processedEventCount.sum();
+    }
+
+    public ProductRankingMemoryStats memoryStats() {
+        Runtime runtime = Runtime.getRuntime();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+
+        return new ProductRankingMemoryStats(
+                productRankingStore.hashLength(),
+                productRankingStore.estimatedHashMemoryBytes(),
+                productRankingStore.estimatedBytesPerEntry(),
+                totalMemory - freeMemory,
+                totalMemory,
+                runtime.maxMemory()
+        );
     }
 }

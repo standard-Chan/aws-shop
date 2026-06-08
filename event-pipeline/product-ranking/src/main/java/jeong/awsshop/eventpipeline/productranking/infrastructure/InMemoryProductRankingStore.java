@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class InMemoryProductRankingStore implements ProductRankingStore {
 
+    private static final long ESTIMATED_BYTES_PER_ENTRY = 128L;
+
     private final ConcurrentHashMap<Long, LongAdder> scores = new ConcurrentHashMap<>();
 
     @Override
@@ -36,6 +38,21 @@ public class InMemoryProductRankingStore implements ProductRankingStore {
                         rankedScores.get(index).score()
                 ))
                 .toList();
+    }
+
+    @Override
+    public long hashLength() {
+        return scores.mappingCount();
+    }
+
+    @Override
+    public long estimatedHashMemoryBytes() {
+        return hashLength() * ESTIMATED_BYTES_PER_ENTRY;
+    }
+
+    @Override
+    public long estimatedBytesPerEntry() {
+        return ESTIMATED_BYTES_PER_ENTRY;
     }
 
     private record RankedScore(Long productId, long score) {

@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import java.util.List;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.application.ProductRankingService;
+import jeong.awsshop.eventpipeline.productranking.presentation.dto.EventProcessingCountResponse;
+import jeong.awsshop.eventpipeline.productranking.presentation.dto.ProductRankingMemoryStatsResponse;
 import jeong.awsshop.eventpipeline.productranking.presentation.dto.ProductRankingResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +30,16 @@ public class ProductRankingController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void record(@Valid @RequestBody UserBehaviorEventMessage event) {
         productRankingService.record(event);
+    }
+
+    @GetMapping("/events/count")
+    public EventProcessingCountResponse eventCount() {
+        return new EventProcessingCountResponse(productRankingService.processedEventCount());
+    }
+
+    @GetMapping("/memory")
+    public ProductRankingMemoryStatsResponse memoryStats() {
+        return ProductRankingMemoryStatsResponse.from(productRankingService.memoryStats());
     }
 
     @GetMapping("/rankings")
