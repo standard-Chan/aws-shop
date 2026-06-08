@@ -1,0 +1,76 @@
+@rankingHost = http://localhost:18083
+
+### 전체 event 개수 조회
+GET {{rankingHost}}/api/event-pipeline/product-ranking/events/count
+
+### 검색 이벤트 메시지 랭킹 반영
+POST {{rankingHost}}/api/event-pipeline/product-ranking/events
+Content-Type: application/json
+
+{
+  "eventId": 103,
+  "eventType": "SEARCH",
+  "userId": 1,
+  "occurredAt": "2026-06-07T06:00:00Z",
+  "keyword": "macbook",
+  "productId": null,
+  "orderId": null,
+  "searchEventId": null
+}
+
+### 상품 상세 조회 이벤트 메시지 랭킹 반영
+POST {{rankingHost}}/api/event-pipeline/product-ranking/events
+Content-Type: application/json
+
+{
+  "eventId": 101,
+  "eventType": "PRODUCT_VIEW",
+  "userId": 1,
+  "occurredAt": "2026-06-07T06:00:01Z",
+  "keyword": "macbook",
+  "productId": 105,
+  "orderId": null,
+  "searchEventId": 100
+}
+
+### 장바구니 추가 이벤트 메시지 랭킹 반영
+POST {{rankingHost}}/api/event-pipeline/product-ranking/events
+Content-Type: application/json
+
+{
+  "eventId": 102,
+  "eventType": "ADD_TO_CART",
+  "userId": 1,
+  "occurredAt": "2026-06-07T06:00:02Z",
+  "keyword": null,
+  "productId": 100,
+  "orderId": null,
+  "searchEventId": null
+}
+
+### 구매 이벤트 메시지 랭킹 반영 제외
+POST {{rankingHost}}/api/event-pipeline/product-ranking/events
+Content-Type: application/json
+
+{
+  "eventId": 103,
+  "eventType": "PURCHASE",
+  "userId": 1,
+  "occurredAt": "2026-06-07T06:00:03Z",
+  "keyword": null,
+  "productId": null,
+  "orderId": 500,
+  "searchEventId": null
+}
+
+### 최근 1시간 상품 랭킹 조회
+GET {{rankingHost}}/api/event-pipeline/product-ranking/rankings?window=ONE_HOUR&limit=10
+
+### 최근 1일 상품 랭킹 조회
+GET {{rankingHost}}/api/event-pipeline/product-ranking/rankings?window=ONE_DAY&limit=10
+
+### 최근 1주 상품 랭킹 조회
+GET {{rankingHost}}/api/event-pipeline/product-ranking/rankings?window=ONE_WEEK&limit=10
+
+### 랭킹 hash 길이 및 메모리 사용량 조회
+GET {{rankingHost}}/api/event-pipeline/product-ranking/memory
