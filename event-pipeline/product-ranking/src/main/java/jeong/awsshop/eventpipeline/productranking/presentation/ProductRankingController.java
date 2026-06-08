@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.application.ProductRankingService;
+import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import jeong.awsshop.eventpipeline.productranking.presentation.dto.EventProcessingCountResponse;
 import jeong.awsshop.eventpipeline.productranking.presentation.dto.ProductRankingMemoryStatsResponse;
 import jeong.awsshop.eventpipeline.productranking.presentation.dto.ProductRankingResponse;
@@ -43,9 +44,12 @@ public class ProductRankingController {
     }
 
     @GetMapping("/rankings")
-    public List<ProductRankingResponse> rankings(@RequestParam(defaultValue = "10") int limit) {
+    public List<ProductRankingResponse> rankings(
+            @RequestParam(defaultValue = "ONE_HOUR") RankingWindow window,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
         int normalizedLimit = Math.max(1, Math.min(limit, 100));
-        return productRankingService.findTop(normalizedLimit).stream()
+        return productRankingService.findTop(window, normalizedLimit).stream()
                 .map(ProductRankingResponse::from)
                 .toList();
     }

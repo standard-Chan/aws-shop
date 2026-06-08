@@ -1,11 +1,14 @@
 package jeong.awsshop.eventpipeline.productranking.application;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.LongAdder;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingMemoryStats;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
+import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,10 +21,12 @@ public class ProductRankingService {
     // private static final long PURCHASE_SCORE = 30L;
 
     private final ProductRankingStore productRankingStore;
+    private final Clock clock;
     private final LongAdder processedEventCount = new LongAdder();
 
-    public ProductRankingService(ProductRankingStore productRankingStore) {
+    public ProductRankingService(ProductRankingStore productRankingStore, Clock clock) {
         this.productRankingStore = productRankingStore;
+        this.clock = clock;
     }
 
     public void record(UserBehaviorEventMessage event) {
@@ -44,12 +49,12 @@ public class ProductRankingService {
         };
 
         if (score > 0) {
-            productRankingStore.increaseScore(productId, score);
+            productRankingStore.increaseScore(productId, score, occurredAt(event));
         }
     }
 
-    public List<ProductRankingItem> findTop(int limit) {
-        return productRankingStore.findTop(limit);
+    public List<ProductRankingItem> findTop(RankingWindow window, int limit) {
+        return productRankingStore.findTop(window, limit, clock.instant());
     }
 
     public long processedEventCount() {
@@ -69,5 +74,12 @@ public class ProductRankingService {
                 totalMemory,
                 runtime.maxMemory()
         );
+    }
+
+    private Instant occurredAt(UserBehaviorEventMessage event) {
+        if (event.occurredAt() == null) {
+            return clock.instant();
+        }
+        return event.occurredAt();
     }
 }
