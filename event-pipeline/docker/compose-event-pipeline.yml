@@ -113,6 +113,13 @@ services:
       # Elasticsearch JVM heap 크기
       ES_JAVA_OPTS: -Xms512m -Xmx512m
 
+  # Product Ranking Redis store
+  redis:
+    image: redis:7.2-alpine
+    container_name: aws-shop-event-product-ranking-redis
+    ports:
+      - "16379:6379"
+
   # Kafka Connect 분산 worker
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.6.1

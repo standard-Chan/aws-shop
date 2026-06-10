@@ -32,6 +32,13 @@ services:
       # Consumer group 초기 rebalance 지연 시간
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
 
+  # Product Ranking Redis store
+  redis:
+    image: redis:7.2-alpine
+    container_name: aws-shop-event-product-ranking-redis-local
+    ports:
+      - "16379:6379"
+
   # Elasticsearch 단일 노드
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
