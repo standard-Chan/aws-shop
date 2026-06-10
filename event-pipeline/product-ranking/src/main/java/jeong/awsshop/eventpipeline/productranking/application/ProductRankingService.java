@@ -70,6 +70,7 @@ public class ProductRankingService {
                 productRankingStore.hashLength(),
                 productRankingStore.estimatedHashMemoryBytes(),
                 productRankingStore.estimatedBytesPerEntry(),
+                productRankingStore.redisUsedMemoryBytes(),
                 totalMemory - freeMemory,
                 totalMemory,
                 runtime.maxMemory()

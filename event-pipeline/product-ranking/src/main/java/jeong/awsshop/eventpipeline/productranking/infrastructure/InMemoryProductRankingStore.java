@@ -84,6 +84,11 @@ public class InMemoryProductRankingStore implements ProductRankingStore {
         return ESTIMATED_BYTES_PER_ENTRY;
     }
 
+    @Override
+    public long redisUsedMemoryBytes() {
+        return 0L;
+    }
+
     private void pruneExpiredBuckets(Instant now) {
         long oldestBucketKey = bucketKey(now.minus(RETENTION));
         buckets.keySet().removeIf(bucketKey -> bucketKey < oldestBucketKey);

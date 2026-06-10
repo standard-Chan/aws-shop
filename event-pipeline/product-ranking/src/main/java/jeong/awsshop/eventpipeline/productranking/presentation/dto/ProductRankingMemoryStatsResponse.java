@@ -6,6 +6,7 @@ public record ProductRankingMemoryStatsResponse(
         long hashLength,
         long estimatedHashMemoryBytes,
         long estimatedBytesPerEntry,
+        long redisUsedMemoryBytes,
         long jvmUsedMemoryBytes,
         long jvmTotalMemoryBytes,
         long jvmMaxMemoryBytes
@@ -16,6 +17,7 @@ public record ProductRankingMemoryStatsResponse(
                 stats.hashLength(),
                 stats.estimatedHashMemoryBytes(),
                 stats.estimatedBytesPerEntry(),
+                stats.redisUsedMemoryBytes(),
                 stats.jvmUsedMemoryBytes(),
                 stats.jvmTotalMemoryBytes(),
                 stats.jvmMaxMemoryBytes()

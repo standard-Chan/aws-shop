@@ -4,6 +4,7 @@ public record ProductRankingMemoryStats(
         long hashLength,
         long estimatedHashMemoryBytes,
         long estimatedBytesPerEntry,
+        long redisUsedMemoryBytes,
         long jvmUsedMemoryBytes,
         long jvmTotalMemoryBytes,
         long jvmMaxMemoryBytes
