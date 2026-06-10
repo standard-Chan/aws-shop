@@ -11,7 +11,7 @@ Content-Type: application/json
   "eventId": 103,
   "eventType": "SEARCH",
   "userId": 1,
-  "occurredAt": "2026-06-07T06:00:00Z",
+  "occurredAt": null,
   "keyword": "macbook",
   "productId": null,
   "orderId": null,
@@ -23,12 +23,12 @@ POST {{rankingHost}}/api/event-pipeline/product-ranking/events
 Content-Type: application/json
 
 {
-  "eventId": 101,
+  "eventId": 105,
   "eventType": "PRODUCT_VIEW",
   "userId": 1,
-  "occurredAt": "2026-06-07T06:00:01Z",
+  "occurredAt": null,
   "keyword": "macbook",
-  "productId": 105,
+  "productId": 106,
   "orderId": null,
   "searchEventId": 100
 }
@@ -38,12 +38,12 @@ POST {{rankingHost}}/api/event-pipeline/product-ranking/events
 Content-Type: application/json
 
 {
-  "eventId": 102,
+  "eventId": 105,
   "eventType": "ADD_TO_CART",
   "userId": 1,
-  "occurredAt": "2026-06-07T06:00:02Z",
+  "occurredAt": null,
   "keyword": null,
-  "productId": 100,
+  "productId": 1022,
   "orderId": null,
   "searchEventId": null
 }
@@ -56,7 +56,7 @@ Content-Type: application/json
   "eventId": 103,
   "eventType": "PURCHASE",
   "userId": 1,
-  "occurredAt": "2026-06-07T06:00:03Z",
+  "occurredAt": null,
   "keyword": null,
   "productId": null,
   "orderId": 500,
