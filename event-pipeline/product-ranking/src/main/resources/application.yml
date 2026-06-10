@@ -6,6 +6,10 @@ spring:
       - optional:file:event-pipeline/.env[.properties]
       - optional:file:../.env[.properties]
       - optional:file:.env[.properties]
+  data:
+    redis:
+      host: ${EVENT_PRODUCT_RANKING_REDIS_HOST:localhost}
+      port: ${EVENT_PRODUCT_RANKING_REDIS_PORT:16379}
 
 server:
   port: ${EVENT_PRODUCT_RANKING_PORT:18083}
