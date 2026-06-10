@@ -39,6 +39,7 @@ public class ProductRankingController {
     }
 
     @GetMapping("/memory")
+    @Deprecated(since = "1.2.1", forRemoval = false)
     public ProductRankingMemoryStatsResponse memoryStats() {
         return ProductRankingMemoryStatsResponse.from(productRankingService.memoryStats());
     }
