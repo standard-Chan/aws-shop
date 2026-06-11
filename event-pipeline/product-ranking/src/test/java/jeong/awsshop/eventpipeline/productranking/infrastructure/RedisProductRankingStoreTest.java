@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
 
 import java.time.Instant;
+import java.util.List;
+import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingScoreDelta;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,25 @@ class RedisProductRankingStoreTest {
         store.increaseScore(100L, 1L, NOW);
         store.increaseScore(100L, 3L, NOW);
         store.increaseScore(200L, 10L, NOW);
+
+        var rankings = store.findTop(RankingWindow.ONE_HOUR, 10, NOW);
+
+        assertThat(rankings)
+                .extracting("rank", "productId", "score")
+                .containsExactly(
+                        tuple(1L, 200L, 10L),
+                        tuple(2L, 100L, 4L)
+                );
+    }
+
+    @Test
+    @DisplayName("여러 상품 점수를 Redis pipeline batch로 누적해야 한다")
+    void should_accumulate_scores_by_batch() {
+        store.increaseScores(List.of(
+                new ProductRankingScoreDelta(100L, 1L, NOW),
+                new ProductRankingScoreDelta(100L, 3L, NOW),
+                new ProductRankingScoreDelta(200L, 10L, NOW)
+        ));
 
         var rankings = store.findTop(RankingWindow.ONE_HOUR, 10, NOW);
 

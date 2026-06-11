@@ -18,8 +18,13 @@ class ProductRankingServiceTest {
     private static final Instant NOW = Instant.parse("2026-06-07T06:00:00Z");
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
+    private final InMemoryProductRankingStore productRankingStore = new InMemoryProductRankingStore();
     private final ProductRankingService productRankingService =
-            new ProductRankingService(new InMemoryProductRankingStore(), CLOCK);
+            new ProductRankingService(productRankingStore, delta -> productRankingStore.increaseScore(
+                    delta.productId(),
+                    delta.score(),
+                    delta.occurredAt()
+            ), CLOCK);
 
     @Test
     @DisplayName("이벤트 타입별 점수를 productId 기준으로 누적해야 한다")
