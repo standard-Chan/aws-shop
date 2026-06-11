@@ -13,3 +13,12 @@ spring:
 
 server:
   port: ${EVENT_PRODUCT_RANKING_PORT:18083}
+
+event-pipeline:
+  product-ranking:
+    batch:
+      size: ${EVENT_PRODUCT_RANKING_BATCH_SIZE:1000}
+      flush-interval-millis: ${EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS:1000}
+      queue-capacity: ${EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY:100000}
+    redis-latency:
+      sample-capacity: ${EVENT_PRODUCT_RANKING_REDIS_LATENCY_SAMPLE_CAPACITY:1000000}

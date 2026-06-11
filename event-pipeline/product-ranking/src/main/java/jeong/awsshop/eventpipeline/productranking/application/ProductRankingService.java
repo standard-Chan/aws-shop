@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.LongAdder;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingMemoryStats;
+import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingScoreDelta;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.springframework.stereotype.Service;
@@ -21,11 +22,17 @@ public class ProductRankingService {
     // private static final long PURCHASE_SCORE = 30L;
 
     private final ProductRankingStore productRankingStore;
+    private final ProductRankingScoreWriter productRankingScoreWriter;
     private final Clock clock;
     private final LongAdder processedEventCount = new LongAdder();
 
-    public ProductRankingService(ProductRankingStore productRankingStore, Clock clock) {
+    public ProductRankingService(
+            ProductRankingStore productRankingStore,
+            ProductRankingScoreWriter productRankingScoreWriter,
+            Clock clock
+    ) {
         this.productRankingStore = productRankingStore;
+        this.productRankingScoreWriter = productRankingScoreWriter;
         this.clock = clock;
     }
 
@@ -49,7 +56,8 @@ public class ProductRankingService {
         };
 
         if (score > 0) {
-            productRankingStore.increaseScore(productId, score, occurredAt(event));
+            // Redis에 바로 쓰지 않고 buffer에 넘겨 batch/pipeline 쓰기 경로를 탄다.
+            productRankingScoreWriter.save(new ProductRankingScoreDelta(productId, score, occurredAt(event)));
         }
     }
 

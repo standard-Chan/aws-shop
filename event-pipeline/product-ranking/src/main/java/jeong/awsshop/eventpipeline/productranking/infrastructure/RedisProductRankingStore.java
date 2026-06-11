@@ -3,6 +3,7 @@ package jeong.awsshop.eventpipeline.productranking.infrastructure;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -10,10 +11,13 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
+import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingScoreDelta;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Repository;
@@ -49,6 +53,35 @@ public class RedisProductRankingStore implements ProductRankingStore {
         redisTemplate.opsForZSet().incrementScore(key, member(productId), score);
         // 오래된 bucket은 Redis TTL로 자연스럽게 제거한다.
         redisTemplate.expire(key, BUCKET_TTL);
+    }
+
+    /**
+     * 여러 이벤트 점수 누적 명령을 Redis pipeline으로 한 번에 전송한다.
+     */
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void increaseScores(List<ProductRankingScoreDelta> deltas) {
+        if (deltas.isEmpty()) {
+            return;
+        }
+
+        Set<String> touchedBucketKeys = new LinkedHashSet<>();
+        redisTemplate.executePipelined(new SessionCallback<>() {
+            @Override
+            public Object execute(RedisOperations operations) {
+                ZSetOperations<String, String> zSetOperations = operations.opsForZSet();
+                for (ProductRankingScoreDelta delta : deltas) {
+                    String key = bucketKey(delta.occurredAt());
+                    touchedBucketKeys.add(key);
+                    zSetOperations.incrementScore(key, member(delta.productId()), delta.score());
+                }
+                // 같은 batch에서 같은 bucket을 여러 번 만져도 TTL 명령은 bucket당 한 번만 보낸다.
+                for (String key : touchedBucketKeys) {
+                    operations.expire(key, BUCKET_TTL);
+                }
+                return null;
+            }
+        });
     }
 
     /**

@@ -15,6 +15,16 @@ public interface ProductRankingStore {
     void increaseScore(Long productId, long score, Instant occurredAt);
 
     /**
+     * 여러 상품 이벤트 점수를 batch 단위로 누적한다.
+     * 기존 구현체는 단건 저장 반복으로 호환하고, Redis 구현체는 pipeline으로 최적화한다.
+     */
+    default void increaseScores(List<ProductRankingScoreDelta> deltas) {
+        for (ProductRankingScoreDelta delta : deltas) {
+            increaseScore(delta.productId(), delta.score(), delta.occurredAt());
+        }
+    }
+
+    /**
      * 현재 시각 기준 window 안에서 점수가 높은 상품을 최대 limit개까지 조회한다.
      */
     List<ProductRankingItem> findTop(RankingWindow window, int limit, Instant now);
