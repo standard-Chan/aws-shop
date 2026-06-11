@@ -22,3 +22,11 @@ event-pipeline:
       queue-capacity: ${EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY:100000}
     redis-latency:
       sample-capacity: ${EVENT_PRODUCT_RANKING_REDIS_LATENCY_SAMPLE_CAPACITY:1000000}
+    cache:
+      refresh-interval-millis: ${EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS:1000}
+    clickhouse:
+      enabled: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED:false}
+      url: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_URL:jdbc:clickhouse://localhost:18123/default}
+      username: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_USERNAME:default}
+      password: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_PASSWORD:}
+      initialize-schema: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_INITIALIZE_SCHEMA:true}

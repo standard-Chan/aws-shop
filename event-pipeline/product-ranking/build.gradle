@@ -23,11 +23,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'com.clickhouse:clickhouse-jdbc:0.6.5'
 
     // TEST
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:testcontainers'  // Docker 컨테이너를 띄워서 테스트
+    testImplementation 'org.testcontainers:clickhouse'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
