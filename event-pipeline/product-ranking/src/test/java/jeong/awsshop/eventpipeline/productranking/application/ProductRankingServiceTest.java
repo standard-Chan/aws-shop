@@ -6,10 +6,12 @@ import static org.assertj.core.groups.Tuple.tuple;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.Executors;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventMessage;
 import jeong.awsshop.eventpipeline.common.UserBehaviorEventType;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import jeong.awsshop.eventpipeline.productranking.infrastructure.InMemoryProductRankingStore;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -19,12 +21,23 @@ class ProductRankingServiceTest {
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     private final InMemoryProductRankingStore productRankingStore = new InMemoryProductRankingStore();
+    private final ProductRankingCache productRankingCache = new ProductRankingCache(
+            productRankingStore,
+            CLOCK,
+            1000,
+            Executors.newSingleThreadScheduledExecutor()
+    );
     private final ProductRankingService productRankingService =
-            new ProductRankingService(productRankingStore, delta -> productRankingStore.increaseScore(
+            new ProductRankingService(productRankingStore, productRankingCache, delta -> productRankingStore.increaseScore(
                     delta.productId(),
                     delta.score(),
                     delta.occurredAt()
             ), CLOCK);
+
+    @AfterEach
+    void tearDown() {
+        productRankingCache.stop();
+    }
 
     @Test
     @DisplayName("이벤트 타입별 점수를 productId 기준으로 누적해야 한다")
@@ -33,6 +46,7 @@ class ProductRankingServiceTest {
         productRankingService.record(event(UserBehaviorEventType.PRODUCT_VIEW, 100L, NOW));
         productRankingService.record(event(UserBehaviorEventType.ADD_TO_CART, 100L, NOW));
         productRankingService.record(event(UserBehaviorEventType.PRODUCT_VIEW, 200L, NOW));
+        productRankingCache.refreshSafely();
 
         var rankings = productRankingService.findTop(RankingWindow.ONE_HOUR, 10);
 
@@ -49,6 +63,7 @@ class ProductRankingServiceTest {
     void should_ignore_event_without_product_id() {
         productRankingService.record(event(UserBehaviorEventType.SEARCH, null, NOW));
         productRankingService.record(event(UserBehaviorEventType.PURCHASE, null, NOW));
+        productRankingCache.refreshSafely();
 
         assertThat(productRankingService.findTop(RankingWindow.ONE_HOUR, 10)).isEmpty();
     }
@@ -60,6 +75,7 @@ class ProductRankingServiceTest {
         productRankingService.record(event(UserBehaviorEventType.ADD_TO_CART, 200L, NOW.minusSeconds(2 * 60 * 60)));
         productRankingService.record(event(UserBehaviorEventType.ADD_TO_CART, 300L, NOW.minusSeconds(2 * 24 * 60 * 60)));
         productRankingService.record(event(UserBehaviorEventType.ADD_TO_CART, 400L, NOW.minusSeconds(8 * 24 * 60 * 60)));
+        productRankingCache.refreshSafely();
 
         assertThat(productRankingService.findTop(RankingWindow.ONE_HOUR, 10))
                 .extracting("productId", "score")
