@@ -12,6 +12,12 @@ import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
 import org.springframework.stereotype.Service;
 
+/**
+ * 사용자 행동 이벤트를 상품 랭킹 점수로 변환하고, 캐시된 랭킹 조회를 제공하는 application service다.
+ *
+ * 쓰기 경로는 {@link ProductRankingScoreWriter}로 전달해 batch/pipeline 저장 흐름을 타고,
+ * 읽기 경로는 {@link ProductRankingCache}에서 주기적으로 갱신된 snapshot을 반환한다.
+ */
 @Service
 public class ProductRankingService {
 
@@ -22,20 +28,28 @@ public class ProductRankingService {
     // private static final long PURCHASE_SCORE = 30L;
 
     private final ProductRankingStore productRankingStore;
+    private final ProductRankingCache productRankingCache;
     private final ProductRankingScoreWriter productRankingScoreWriter;
     private final Clock clock;
     private final LongAdder processedEventCount = new LongAdder();
 
     public ProductRankingService(
             ProductRankingStore productRankingStore,
+            ProductRankingCache productRankingCache,
             ProductRankingScoreWriter productRankingScoreWriter,
             Clock clock
     ) {
         this.productRankingStore = productRankingStore;
+        this.productRankingCache = productRankingCache;
         this.productRankingScoreWriter = productRankingScoreWriter;
         this.clock = clock;
     }
 
+    /**
+     * 사용자 행동 이벤트를 이벤트 타입별 점수로 변환해 상품 랭킹에 반영한다.
+     *
+     * @param event 랭킹 점수로 변환할 사용자 행동 이벤트
+     */
     public void record(UserBehaviorEventMessage event) {
         processedEventCount.increment();
 
@@ -61,14 +75,27 @@ public class ProductRankingService {
         }
     }
 
+    /**
+     * 지정한 시간 window의 상품 랭킹을 캐시에서 조회한다.
+     *
+     * @param window 조회할 랭킹 시간 범위
+     * @param limit 반환할 최대 상품 수
+     * @return 캐시된 상품 랭킹 목록
+     */
     public List<ProductRankingItem> findTop(RankingWindow window, int limit) {
-        return productRankingStore.findTop(window, limit, clock.instant());
+        return productRankingCache.findTop(window, limit);
     }
 
+    /** 서버 집계 용도
+     * 현재 application instance가 수신한 이벤트 수를 반환한다.
+     */
     public long processedEventCount() {
         return processedEventCount.sum();
     }
 
+    /** 서버 집계 용도
+     * 랭킹 저장소와 JVM 메모리 사용량 통계를 반환한다.
+     */
     public ProductRankingMemoryStats memoryStats() {
         Runtime runtime = Runtime.getRuntime();
         long totalMemory = runtime.totalMemory();
