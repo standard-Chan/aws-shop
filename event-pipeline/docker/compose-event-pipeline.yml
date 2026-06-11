@@ -120,6 +120,18 @@ services:
     ports:
       - "16379:6379"
 
+  # Product Ranking ClickHouse store
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.6-alpine
+    container_name: aws-shop-event-product-ranking-clickhouse
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+
   # Kafka Connect 분산 worker
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.6.1

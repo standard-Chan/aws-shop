@@ -39,6 +39,18 @@ services:
     ports:
       - "16379:6379"
 
+  # Product Ranking ClickHouse store
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.6-alpine
+    container_name: aws-shop-event-product-ranking-clickhouse-local
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+
   # Elasticsearch 단일 노드
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
