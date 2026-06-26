@@ -23,7 +23,10 @@ public class DataImportController {
      * JSONL 파일을 스트림으로 받아서 DB에 batch insert하는 API
      */
     @PostMapping("/upload")
-    public String bulkupload(HttpServletRequest request, @RequestParam(defaultValue = "failed_rows") String filename) throws IOException {
+    public String bulkupload(
+            HttpServletRequest request,
+            @RequestParam(name = "filename", defaultValue = "failed_rows") String filename
+    ) throws IOException {
         InputStream inputStream = request.getInputStream();
 
         bulkInsertService.bulkInsert(inputStream, filename);
