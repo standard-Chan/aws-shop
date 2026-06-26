@@ -28,8 +28,8 @@ public class ProductController {
      */
     @GetMapping
     public ProductCursorResponse getProducts(
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
-            @RequestParam(required = false) Long cursor
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(name = "cursor", required = false) Long cursor
     ) {
         return productReadService.getProducts(size, cursor);
     }
@@ -39,11 +39,11 @@ public class ProductController {
      */
     @GetMapping("/category")
     public ProductCategoryCursorResponse getProductsByCategory(
-            @RequestParam String mainCategory,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
-            @RequestParam(required = false) Long cursorId,
-            @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String direction
+            @RequestParam(name = "mainCategory") String mainCategory,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(name = "cursorId", required = false) Long cursorId,
+            @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "direction", required = false) String direction
     ) {
         return productReadService.getProductsByCategory(
                 mainCategory,
@@ -60,10 +60,10 @@ public class ProductController {
      */
     @GetMapping("/keyword")
     public ProductCategoryCursorResponse getProductsByKeyword(
-            @RequestParam String keyword,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
-            @RequestParam(required = false) Long cursorId,
-            @RequestParam(required = false) String sort,
+            @RequestParam(name = "keyword") String keyword,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(name = "cursorId", required = false) Long cursorId,
+            @RequestParam(name = "sort", required = false) String sort,
             @RequestParam(name = "order", required = false) String direction
     ) {
         return productReadService.getProductsByKeyword(
@@ -79,7 +79,7 @@ public class ProductController {
      * Product id로 단일 상품 상세 정보를 조회한다.
      */
     @GetMapping("/{id}")
-    public ProductDetailResponse getProductDetail(@PathVariable @Positive Long id) {
+    public ProductDetailResponse getProductDetail(@PathVariable(name = "id") @Positive Long id) {
         return productReadService.getProductDetail(id);
     }
 }
