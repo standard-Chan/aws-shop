@@ -38,6 +38,8 @@
 - 각 작업 도메인의 대상의 docs/도메인대상/도메인.md 문서를 읽는다. 만약 존재하지 않는다면, 비어있는 파일로 만들어둔다. 예를 들어, product 도메인을 작업 할때에는 `docs/product/PRODUCT.md`를 먼저 본다.
 - 먼저 해당 기능의 `controller` / `service` / `repository` / `test` 위치를 확인한다.
 - 구현을 마친 뒤에는 사용자가 별도로 막지 않는 한 변경 내용을 기능, 수정, 테스트, 문서 등 의미 있는 단위로 나누어 자동으로 커밋한다.
+- 커밋 제목은 `fix:`, `feat:`, `test:`, `refactor:`, `docs:`, `build:` 같은 Conventional Commit 형식의 prefix와 함께 작성한다.
+- 커밋 본문에는 구현한 내용, 구현 의도, 구현한 이유를 간략히 작성한다.
 
 ## 실행 기준
 - 일반 검증은 `./gradlew test`를 우선 사용한다.
