@@ -36,6 +36,9 @@ docker compose -f event-pipeline/docker/compose-event-pipeline.yml down
 - Kafka 3 broker bootstrap: `localhost:19092,localhost:19093,localhost:19094`
 - Elasticsearch: `http://localhost:19200`
 - Kafka Connect REST API: `http://localhost:18083`
+- Product Ranking Redis: `localhost:16379`
+- Product Ranking ClickHouse HTTP: `http://localhost:18123`
+- Product Ranking ClickHouse native: `localhost:19000`
 
 ## Kafka Connect Connector
 

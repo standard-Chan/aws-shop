@@ -7,7 +7,7 @@
 - `common`: 이벤트 메시지와 이벤트 타입 공통 라이브러리. 직접 실행하지 않는다.
 - `producer-api`: 사용자 행동 이벤트를 HTTP로 받고 Kafka에 발행하는 서버.
 - `monolith-api`: 사용자 행동 이벤트를 HTTP로 받고 내부 sink에 저장을 위임하는 모놀리스 시작점. Kafka를 사용하지 않는다.
-- `product-ranking`: 사용자 행동 이벤트 메시지를 REST API로 받아 메모리 기반 상품 랭킹을 계산하는 서버. Kafka를 사용하지 않는다.
+- `product-ranking`: 사용자 행동 이벤트 메시지를 REST API로 받아 Redis/ClickHouse 기반 상품 랭킹을 계산하는 서버. Kafka를 사용하지 않는다.
 - `db-consumer`: Kafka 이벤트를 구독해서 DB에 저장하는 consumer 서버.
 - `hadoop-consumer`: Kafka 이벤트를 구독해서 Hadoop 적재 전 단계의 JSONL 파일로 저장하는 consumer 서버.
 - `kafka-connect`: Elasticsearch Sink Connector 등록 설정.
@@ -51,8 +51,24 @@ Elasticsearch 기본 URL은 `http://localhost:19200`, 기본 index는 `user-beha
 `EVENT_MONOLITH_BATCH_SIZE`, `EVENT_MONOLITH_BATCH_FLUSH_INTERVAL_MILLIS`로 변경할 수 있다.
 
 Product Ranking 서버는 별도 프로세스로 켜고 끌 수 있다. 기본 포트는 `18083`이다.
+랭킹 저장소는 Redis를 사용한다. 로컬 Compose 기준 Redis host port는 `16379`이며, `EVENT_PRODUCT_RANKING_REDIS_HOST`, `EVENT_PRODUCT_RANKING_REDIS_PORT`로 변경할 수 있다.
+ClickHouse를 켜면 같은 ranking score batch를 Redis와 ClickHouse에 병행 적재한다.
+초기 비교 기간에는 `ONE_HOUR` 응답은 Redis snapshot을 유지하고 ClickHouse 결과와 로그로 비교한다.
+`ONE_DAY`, `ONE_WEEK` 응답은 ClickHouse snapshot을 우선 사용한다.
+로컬 Compose 기준 ClickHouse HTTP port는 `18123`, native port는 `19000`이다.
+
+기존 in-memory ranking store는 deprecated 되었고 `in-memory-ranking` profile에서만 사용한다.
+`GET /api/event-pipeline/product-ranking/memory`는 호환성을 위해 유지하지만 deprecated API이며, Redis 전환 후에는 저장소 통계 추정값으로만 사용한다.
 
 ```bash
+docker compose -f event-pipeline/docker/compose-event-pipeline-local.yml up -d redis clickhouse
+EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED=true ./gradlew :event-pipeline:product-ranking:bootRun
+```
+
+Redis만으로 실행할 수도 있다.
+
+```bash
+docker compose -f event-pipeline/docker/compose-event-pipeline-local.yml up -d redis
 ./gradlew :event-pipeline:product-ranking:bootRun
 ```
 
