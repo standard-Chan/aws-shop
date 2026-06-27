@@ -14,6 +14,7 @@ import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingScoreDelta;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisOperations;
@@ -24,6 +25,11 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("!in-memory-ranking")
+@ConditionalOnProperty(
+        prefix = "event-pipeline.product-ranking.redis",
+        name = "enabled",
+        havingValue = "true"
+)
 public class RedisProductRankingStore implements ProductRankingStore {
 
     // 분 단위 bucket으로 쓰기 비용을 낮추고, 조회 시 필요한 시간 범위만 합산한다.

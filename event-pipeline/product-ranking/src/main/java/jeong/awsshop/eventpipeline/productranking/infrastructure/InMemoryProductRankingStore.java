@@ -11,15 +11,20 @@ import java.util.stream.IntStream;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 @Deprecated(since = "1.2.1", forRemoval = false)
 @Repository
-@Profile("in-memory-ranking")
+@ConditionalOnProperty(
+        prefix = "event-pipeline.product-ranking.redis",
+        name = "enabled",
+        havingValue = "false",
+        matchIfMissing = true
+)
 public class InMemoryProductRankingStore implements ProductRankingStore {
 
-    // 로컬 실험용 deprecated fallback이다. 기본 구현체는 RedisProductRankingStore다.
+    // Redis를 끈 로컬/부하테스트용 fallback이다.
     private static final long ESTIMATED_BYTES_PER_ENTRY = 128L;
     private static final Duration BUCKET_SIZE = Duration.ofMinutes(1);
     private static final Duration RETENTION = Duration.ofDays(7);
