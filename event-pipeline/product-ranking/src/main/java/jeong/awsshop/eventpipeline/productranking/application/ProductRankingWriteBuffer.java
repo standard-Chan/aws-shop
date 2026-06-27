@@ -12,9 +12,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingScoreDelta;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
+import jeong.awsshop.eventpipeline.productranking.infrastructure.clickhouse.ClickHouseProductRankingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,8 @@ import org.springframework.stereotype.Component;
 public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
 
     private static final Logger log = LoggerFactory.getLogger(ProductRankingWriteBuffer.class);
+    private static final long QUEUE_SIZE_LOG_INTERVAL_MILLIS = 5000L;
+    private static final long NANOS_PER_MILLI = 1_000_000L;
 
     /*
      * HTTP 요청 thread와 Redis write thread 사이의 경계다.
@@ -36,6 +40,8 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
     private final int batchSize;
     private final long flushIntervalMillis;
     private final ProductRankingStore productRankingStore;
+    // ClickHouse는 선택 기능이다. Bean이 없으면 Redis-only 경로로 동작한다.
+    private final ClickHouseProductRankingStore clickHouseProductRankingStore;
     private final ProductRankingScoreCompressor productRankingScoreCompressor = new ProductRankingScoreCompressor();
     private final ScheduledExecutorService executor;
 
@@ -44,13 +50,15 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
             @Value("${event-pipeline.product-ranking.batch.size:5000}") int batchSize,
             @Value("${event-pipeline.product-ranking.batch.flush-interval-millis:500}") long flushIntervalMillis,
             @Value("${event-pipeline.product-ranking.batch.queue-capacity:100000}") int queueCapacity,
-            ProductRankingStore productRankingStore
+            ProductRankingStore productRankingStore,
+            ObjectProvider<ClickHouseProductRankingStore> clickHouseProductRankingStoreProvider
     ) {
         this(
                 batchSize,
                 flushIntervalMillis,
                 queueCapacity,
                 productRankingStore,
+                clickHouseProductRankingStoreProvider.getIfAvailable(),
                 Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "product-ranking-batch-writer");
                     thread.setDaemon(true);
@@ -66,6 +74,17 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
             ProductRankingStore productRankingStore,
             ScheduledExecutorService executor
     ) {
+        this(batchSize, flushIntervalMillis, queueCapacity, productRankingStore, null, executor);
+    }
+
+    ProductRankingWriteBuffer(
+            int batchSize,
+            long flushIntervalMillis,
+            int queueCapacity,
+            ProductRankingStore productRankingStore,
+            ClickHouseProductRankingStore clickHouseProductRankingStore,
+            ScheduledExecutorService executor
+    ) {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize must be positive");
         }
@@ -79,6 +98,7 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
         this.flushIntervalMillis = flushIntervalMillis;
         this.queue = new LinkedBlockingQueue<>(queueCapacity);
         this.productRankingStore = productRankingStore;
+        this.clickHouseProductRankingStore = clickHouseProductRankingStore;
         this.executor = executor;
     }
 
@@ -89,6 +109,12 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
                 this::flushSafely,
                 flushIntervalMillis,
                 flushIntervalMillis,
+                TimeUnit.MILLISECONDS
+        );
+        executor.scheduleWithFixedDelay(
+                this::logQueueSize,
+                QUEUE_SIZE_LOG_INTERVAL_MILLIS,
+                QUEUE_SIZE_LOG_INTERVAL_MILLIS,
                 TimeUnit.MILLISECONDS
         );
     }
@@ -126,20 +152,62 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
         return queue.size();
     }
 
-    /**
-     * 무한 루프로 작성한 이유 : flush interval까지 대기하지 않고, 한번에 비우기 위함이다.
-     * 만약 대기해야한다면, flush -> batch 처리, -> 1초 대기 -> flush -> batch 처리 -> 1초 대기 ... 이런식으로 진행되어,
-     *  batch 처리 후 최대 flush interval 만큼 Redis 반영이 지연될 수 있다.
-     */
     private void flushAvailable() {
-        while (!queue.isEmpty()) {
-            List<ProductRankingScoreDelta> batch = drainBatch();
-            if (batch.isEmpty()) {
-                return;
-            }
-            // Redis bucket과 같은 기준으로 압축해 batch 안의 중복 ZINCRBY 명령 수를 줄인다.
-            productRankingStore.increaseScores(productRankingScoreCompressor.compress(batch));
+        List<ProductRankingScoreDelta> batch = drainBatch();
+        if (batch.isEmpty()) {
+            return;
         }
+
+        long flushStartedAt = System.nanoTime();
+
+        // Redis bucket과 같은 기준으로 압축해 batch 안의 중복 ZINCRBY 명령 수를 줄인다.
+        long compressStartedAt = System.nanoTime();
+        List<ProductRankingScoreDelta> compressedBatch = productRankingScoreCompressor.compress(batch);
+        long compressNanos = System.nanoTime() - compressStartedAt;
+
+        // 실시간 랭킹 저장소 반영을 먼저 처리한다.
+        long rankingStoreStartedAt = System.nanoTime();
+        productRankingStore.increaseScores(compressedBatch);
+        long rankingStoreNanos = System.nanoTime() - rankingStoreStartedAt;
+
+        // ClickHouse는 병행 적재 대상이다. 실패해도 Redis 반영 성공을 되돌리지 않는다.
+        long clickHouseNanos = flushClickHouse(compressedBatch);
+        long totalNanos = System.nanoTime() - flushStartedAt;
+
+        log.info(
+                "Flushed product ranking score batch. batchSize={}, compressedBatchSize={}, queuedDeltaCount={}, "
+                        + "compressMillis={}, rankingStoreMillis={}, clickHouseMillis={}, totalMillis={}, "
+                        + "rankingStoreType={}, clickHouseEnabled={}",
+                batch.size(),
+                compressedBatch.size(),
+                queue.size(),
+                toMillis(compressNanos),
+                toMillis(rankingStoreNanos),
+                toMillis(clickHouseNanos),
+                toMillis(totalNanos),
+                productRankingStore.getClass().getSimpleName(),
+                clickHouseProductRankingStore != null
+        );
+    }
+
+    /**
+     * clickHouse에 batch 단위로 점수를 반영한다.
+     */
+    private long flushClickHouse(List<ProductRankingScoreDelta> compressedBatch) {
+        // ClickHouse 기능이 꺼져 있으면 추가 I/O 없이 바로 끝난다.
+        if (clickHouseProductRankingStore == null) {
+            return 0L;
+        }
+
+        long startedAt = System.nanoTime();
+        try {
+            clickHouseProductRankingStore.increaseScores(compressedBatch);
+        } catch (RuntimeException exception) {
+            // ClickHouse 장애가 요청 수신/Redis 실시간 랭킹 경로를 막지 않도록 여기서 격리한다.
+            log.error("Failed to flush product ranking score batch to ClickHouse. batchSize={}",
+                    compressedBatch.size(), exception);
+        }
+        return System.nanoTime() - startedAt;
     }
 
     /** 락 없이 한 번에 데이터를 꺼낸다 */
@@ -147,5 +215,13 @@ public class ProductRankingWriteBuffer implements ProductRankingScoreWriter {
         List<ProductRankingScoreDelta> batch = new ArrayList<>(batchSize);
         queue.drainTo(batch, batchSize);
         return batch;
+    }
+
+    private void logQueueSize() {
+        log.info("Product ranking write buffer queue size. queuedDeltaCount={}", queue.size());
+    }
+
+    private long toMillis(long nanos) {
+        return nanos / NANOS_PER_MILLI;
     }
 }

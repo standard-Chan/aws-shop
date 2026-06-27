@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -16,6 +17,7 @@ import java.util.concurrent.Executors;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingItem;
 import jeong.awsshop.eventpipeline.productranking.domain.ProductRankingStore;
 import jeong.awsshop.eventpipeline.productranking.domain.RankingWindow;
+import jeong.awsshop.eventpipeline.productranking.infrastructure.clickhouse.ClickHouseProductRankingStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -126,9 +128,66 @@ class ProductRankingCacheTest {
         cache.stop();
     }
 
+    @Test
+    @DisplayName("ClickHouse가 있으면 1일과 1주 랭킹은 ClickHouse snapshot을 사용해야 한다")
+    void should_refresh_long_window_rankings_from_clickhouse() {
+        ProductRankingStore redisStore = Mockito.mock(ProductRankingStore.class);
+        ClickHouseProductRankingStore clickHouseStore = Mockito.mock(ClickHouseProductRankingStore.class);
+        stubEmptyRankings(redisStore);
+        when(clickHouseStore.findTop(RankingWindow.ONE_HOUR, 100, NOW)).thenReturn(List.of());
+        when(clickHouseStore.findTop(RankingWindow.ONE_DAY, 100, NOW))
+                .thenReturn(List.of(new ProductRankingItem(1L, 200L, 20L)));
+        when(clickHouseStore.findTop(RankingWindow.ONE_WEEK, 100, NOW))
+                .thenReturn(List.of(new ProductRankingItem(1L, 300L, 30L)));
+        ProductRankingCache cache = cache(redisStore, clickHouseStore);
+
+        cache.refreshSafely();
+
+        assertThat(cache.findTop(RankingWindow.ONE_DAY, 10))
+                .extracting("rank", "productId", "score")
+                .containsExactly(tuple(1L, 200L, 20L));
+        assertThat(cache.findTop(RankingWindow.ONE_WEEK, 10))
+                .extracting("rank", "productId", "score")
+                .containsExactly(tuple(1L, 300L, 30L));
+        verify(redisStore).findTop(RankingWindow.ONE_HOUR, 100, NOW);
+        verify(redisStore, never()).findTop(RankingWindow.ONE_DAY, 100, NOW);
+        verify(redisStore, never()).findTop(RankingWindow.ONE_WEEK, 100, NOW);
+        cache.stop();
+    }
+
+    @Test
+    @DisplayName("ClickHouse가 있더라도 1시간 랭킹 응답은 Redis snapshot을 유지해야 한다")
+    void should_keep_one_hour_response_from_redis_with_clickhouse_comparison() {
+        ProductRankingStore redisStore = Mockito.mock(ProductRankingStore.class);
+        ClickHouseProductRankingStore clickHouseStore = Mockito.mock(ClickHouseProductRankingStore.class);
+        stubEmptyRankings(redisStore);
+        when(redisStore.findTop(RankingWindow.ONE_HOUR, 100, NOW))
+                .thenReturn(List.of(new ProductRankingItem(1L, 100L, 10L)));
+        when(clickHouseStore.findTop(any(RankingWindow.class), eq(100), eq(NOW))).thenReturn(List.of());
+        ProductRankingCache cache = cache(redisStore, clickHouseStore);
+
+        cache.refreshSafely();
+
+        assertThat(cache.findTop(RankingWindow.ONE_HOUR, 10))
+                .extracting("rank", "productId", "score")
+                .containsExactly(tuple(1L, 100L, 10L));
+        verify(clickHouseStore).findTop(RankingWindow.ONE_HOUR, 100, NOW);
+        cache.stop();
+    }
+
     private ProductRankingCache cache(ProductRankingStore store) {
         return new ProductRankingCache(
                 store,
+                CLOCK,
+                1000,
+                Executors.newSingleThreadScheduledExecutor()
+        );
+    }
+
+    private ProductRankingCache cache(ProductRankingStore store, ClickHouseProductRankingStore clickHouseStore) {
+        return new ProductRankingCache(
+                store,
+                clickHouseStore,
                 CLOCK,
                 1000,
                 Executors.newSingleThreadScheduledExecutor()
