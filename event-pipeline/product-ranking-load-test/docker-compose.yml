@@ -1,0 +1,133 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: aws-shop-product-ranking-load-test-nginx
+    depends_on:
+      - product-ranking-1
+      - product-ranking-2
+    ports:
+      - "${PRODUCT_RANKING_LB_PORT:-18083}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - product-ranking-load-test
+
+  product-ranking-1:
+    build:
+      context: ../..
+      dockerfile: event-pipeline/product-ranking-load-test/Dockerfile
+    container_name: aws-shop-product-ranking-load-test-app-1
+    cpus: "2.0"
+    mem_limit: 8g
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      EVENT_PRODUCT_RANKING_PORT: 18083
+      EVENT_PRODUCT_RANKING_REDIS_ENABLED: ${EVENT_PRODUCT_RANKING_REDIS_ENABLED:-false}
+      EVENT_PRODUCT_RANKING_REDIS_HOST: redis
+      EVENT_PRODUCT_RANKING_REDIS_PORT: 6379
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED:-true}
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?compress=0
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_USERNAME: default
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_PASSWORD: ""
+      EVENT_PRODUCT_RANKING_BATCH_SIZE: ${EVENT_PRODUCT_RANKING_BATCH_SIZE:-5000}
+      EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS:-3000}
+      EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY: ${EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY:-500000}
+      EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS:-10000}
+      JAVA_TOOL_OPTIONS: ${PRODUCT_RANKING_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75}
+    networks:
+      - product-ranking-load-test
+
+  product-ranking-2:
+    build:
+      context: ../..
+      dockerfile: event-pipeline/product-ranking-load-test/Dockerfile
+    container_name: aws-shop-product-ranking-load-test-app-2
+    cpus: "2.0"
+    mem_limit: 8g
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      EVENT_PRODUCT_RANKING_PORT: 18083
+      EVENT_PRODUCT_RANKING_REDIS_ENABLED: ${EVENT_PRODUCT_RANKING_REDIS_ENABLED:-false}
+      EVENT_PRODUCT_RANKING_REDIS_HOST: redis
+      EVENT_PRODUCT_RANKING_REDIS_PORT: 6379
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED:-true}
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?compress=0
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_USERNAME: default
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_PASSWORD: ""
+      EVENT_PRODUCT_RANKING_BATCH_SIZE: ${EVENT_PRODUCT_RANKING_BATCH_SIZE:-5000}
+      EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS:-3000}
+      EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY: ${EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY:-500000}
+      EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS:-10000}
+      JAVA_TOOL_OPTIONS: ${PRODUCT_RANKING_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75}
+    networks:
+      - product-ranking-load-test
+
+  product-ranking-single:
+    build:
+      context: ../..
+      dockerfile: event-pipeline/product-ranking-load-test/Dockerfile
+    container_name: aws-shop-product-ranking-load-test-app-single
+    cpus: "2.0"
+    mem_limit: 8g
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "18080:18083"
+    environment:
+      EVENT_PRODUCT_RANKING_PORT: 18083
+      EVENT_PRODUCT_RANKING_REDIS_ENABLED: ${EVENT_PRODUCT_RANKING_REDIS_ENABLED:-false}
+      EVENT_PRODUCT_RANKING_REDIS_HOST: redis
+      EVENT_PRODUCT_RANKING_REDIS_PORT: 6379
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED: ${EVENT_PRODUCT_RANKING_CLICKHOUSE_ENABLED:-true}
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?compress=0
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_USERNAME: default
+      EVENT_PRODUCT_RANKING_CLICKHOUSE_PASSWORD: ""
+      EVENT_PRODUCT_RANKING_BATCH_SIZE: ${EVENT_PRODUCT_RANKING_BATCH_SIZE:-5000}
+      EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_BATCH_FLUSH_INTERVAL_MILLIS:-3000}
+      EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY: ${EVENT_PRODUCT_RANKING_BATCH_QUEUE_CAPACITY:-500000}
+      EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS: ${EVENT_PRODUCT_RANKING_CACHE_REFRESH_INTERVAL_MILLIS:-10000}
+      JAVA_TOOL_OPTIONS: ${PRODUCT_RANKING_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75}
+    networks:
+      - product-ranking-load-test
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: aws-shop-product-ranking-load-test-redis
+    profiles:
+      - redis
+    ports:
+      - "${PRODUCT_RANKING_REDIS_PORT:-16379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - product-ranking-load-test
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.6-alpine
+    container_name: aws-shop-product-ranking-load-test-clickhouse
+    ports:
+      - "${PRODUCT_RANKING_CLICKHOUSE_HTTP_PORT:-18123}:8123"
+      - "${PRODUCT_RANKING_CLICKHOUSE_NATIVE_PORT:-19000}:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - product-ranking-load-test
+
+networks:
+  product-ranking-load-test:
+    name: aws-shop-product-ranking-load-test
