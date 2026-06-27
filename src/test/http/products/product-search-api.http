@@ -1,0 +1,60 @@
+### product search 재색인 - 기본 pageSize
+
+POST http://localhost:8080/api/admin/products/search/reindex
+Accept: application/json
+
+### product search 재색인 - pageSize 지정
+
+POST http://localhost:8080/api/admin/products/search/reindex?pageSize=1000
+Accept: application/json
+
+### product search 기본 조회 - averageRating 기본 정렬(desc)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20
+Accept: application/json
+
+### product search 조회 - averageRating 정렬(desc)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=averageRating&order=desc
+Accept: application/json
+
+### product search 조회 - averageRating cursor 기반 다음 페이지
+### 아래 cursor 값은 이전 응답의 nextCursor로 교체해서 사용한다.
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=averageRating&order=desc&cursor=REPLACE_WITH_NEXT_CURSOR
+Accept: application/json
+
+### product search 조회 - ratingNumber 정렬(desc)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=ratingNumber&order=desc
+Accept: application/json
+
+### product search 조회 - price 정렬(asc)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=price&order=asc
+Accept: application/json
+
+### product search 조회 - price 정렬(desc)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=price&order=desc
+Accept: application/json
+
+### product search 조회 - 결과 없음
+
+GET http://localhost:8080/api/products/search?keyword=no-such-keyword&size=20
+Accept: application/json
+
+### product search 조회 - blank keyword
+
+GET http://localhost:8080/api/products/search?keyword=%20%20%20&size=20
+Accept: application/json
+
+### product search 조회 - keyword 누락(400)
+
+GET http://localhost:8080/api/products/search?size=20
+Accept: application/json
+
+### product search 조회 - 잘못된 cursor(400)
+
+GET http://localhost:8080/api/products/search?keyword=wire&size=20&sort=averageRating&order=desc&cursor=invalid-cursor
+Accept: application/json
