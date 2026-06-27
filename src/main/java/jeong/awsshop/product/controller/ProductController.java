@@ -56,8 +56,10 @@ public class ProductController {
 
     /**
      * keyword로 Product 목록을 cursor 방식으로 조회한다.
+     * @deprecated MySQL LIKE 기반 검색 API다. Elasticsearch 검색은 /api/products/search를 사용한다.
      * 외부 계약은 `order` parameter를 유지하지만 내부 표현은 `direction`으로 통일한다.
      */
+    @Deprecated
     @GetMapping("/keyword")
     public ProductCategoryCursorResponse getProductsByKeyword(
             @RequestParam(name = "keyword") String keyword,

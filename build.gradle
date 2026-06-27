@@ -25,6 +25,8 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'              // JSON 파싱을 위한 ObjectMapper
     implementation 'org.springframework.boot:spring-boot-starter-validation' // 입력 데이터 검증 (Bean Validation API)
     implementation 'org.springframework.kafka:spring-kafka'                  // 사용자 행동 이벤트 Kafka 발행
+    implementation 'co.elastic.clients:elasticsearch-java:8.13.4'             // 상품 검색용 Elasticsearch Java API Client
+    implementation 'org.elasticsearch.client:elasticsearch-rest-client:8.13.4' // ES low-level REST client
 
     // --- Database (런타임 환경) ---
     runtimeOnly 'com.mysql:mysql-connector-j'                               // MySQL 드라이버

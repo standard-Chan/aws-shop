@@ -1,4 +1,14 @@
 services:
+  product-search-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: aws-shop-product-search-elasticsearch
+    ports:
+      - "19200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+
   kafka:
     image: apache/kafka:3.7.0
     container_name: aws-shop-kafka
