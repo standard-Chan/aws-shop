@@ -68,10 +68,23 @@ public class ProductSearchReindexService {
             }
             elasticsearchClient.indices().create(c -> c
                     .index(properties.indexName())
+                    .settings(s -> s
+                            .analysis(a -> a
+                                    .analyzer("product_title_analyzer", analyzer -> analyzer
+                                            .custom(custom -> custom
+                                                    .tokenizer("standard")
+                                                    .filter("lowercase", "asciifolding")
+                                            )
+                                    )
+                            )
+                    )
                     .mappings(m -> m
                             .properties("id", p -> p.long_(v -> v))
                             .properties("parentAsin", p -> p.keyword(v -> v))
-                            .properties("title", p -> p.text(v -> v))
+                            .properties("title", p -> p.text(v -> v
+                                    .analyzer("product_title_analyzer")
+                                    .searchAnalyzer("product_title_analyzer")
+                            ))
                             .properties("mainCategory", p -> p.keyword(v -> v))
                             .properties("averageRating", p -> p.double_(v -> v))
                             .properties("ratingNumber", p -> p.integer(v -> v))
