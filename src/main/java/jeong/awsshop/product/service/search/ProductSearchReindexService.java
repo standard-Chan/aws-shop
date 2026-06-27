@@ -7,15 +7,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import jeong.awsshop.product.config.ProductSearchElasticsearchProperties;
+import jeong.awsshop.product.exception.search.ProductSearchIndexPreparationException;
+import jeong.awsshop.product.exception.search.ProductSearchReindexException;
 import jeong.awsshop.product.repository.ProductRepository;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.search.document.ProductSearchDocument;
 import jeong.awsshop.product.service.search.dto.ProductSearchReindexResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -80,7 +80,7 @@ public class ProductSearchReindexService {
                     )
             );
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Product search index preparation failed", e);
+            throw new ProductSearchIndexPreparationException(e);
         }
     }
 
@@ -97,7 +97,7 @@ public class ProductSearchReindexService {
                 return b;
             });
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Product search reindex failed", e);
+            throw new ProductSearchReindexException(e);
         }
     }
 }

@@ -8,9 +8,9 @@ import java.util.Base64;
 import jeong.awsshop.product.service.search.criteria.ProductSearchDirection;
 import jeong.awsshop.product.service.search.criteria.ProductSearchSort;
 import jeong.awsshop.product.service.search.document.ProductSearchDocument;
-import org.springframework.http.HttpStatus;
+import jeong.awsshop.product.exception.search.ProductSearchCursorEncodeException;
+import jeong.awsshop.product.exception.search.ProductSearchInvalidCursorException;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class ProductSearchCursorCodec {
@@ -32,7 +32,7 @@ public class ProductSearchCursorCodec {
             byte[] json = objectMapper.writeValueAsBytes(cursor);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
         } catch (JsonProcessingException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to encode product search cursor", e);
+            throw new ProductSearchCursorEncodeException(e);
         }
     }
 
@@ -64,7 +64,7 @@ public class ProductSearchCursorCodec {
     ) {
         if (cursor.sort() != requestedSort || cursor.direction() != requestedDirection
                 || cursor.id() == null || cursor.sortValue() == null) {
-            throw invalidCursor(null);
+            throw new ProductSearchInvalidCursorException();
         }
     }
 
@@ -83,7 +83,7 @@ public class ProductSearchCursorCodec {
         return value.toPlainString();
     }
 
-    private ResponseStatusException invalidCursor(Throwable cause) {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid product search cursor", cause);
+    private ProductSearchInvalidCursorException invalidCursor(Throwable cause) {
+        return new ProductSearchInvalidCursorException(cause);
     }
 }

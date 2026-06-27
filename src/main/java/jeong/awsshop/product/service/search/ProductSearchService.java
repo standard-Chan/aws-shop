@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import jeong.awsshop.product.config.ProductSearchElasticsearchProperties;
+import jeong.awsshop.product.exception.search.ProductSearchInvalidCursorException;
+import jeong.awsshop.product.exception.search.ProductSearchQueryException;
 import jeong.awsshop.product.service.search.criteria.ProductSearchDirection;
 import jeong.awsshop.product.service.search.criteria.ProductSearchSort;
 import jeong.awsshop.product.service.search.cursor.ProductSearchCursor;
@@ -19,9 +21,7 @@ import jeong.awsshop.product.service.search.document.ProductSearchDocument;
 import jeong.awsshop.product.service.search.dto.ProductSearchItemResponse;
 import jeong.awsshop.product.service.search.dto.ProductSearchResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +54,7 @@ public class ProductSearchService {
             );
             return toResponse(response.hits().hits(), size, selectedSort, selectedDirection);
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Product Elasticsearch search failed", e);
+            throw new ProductSearchQueryException(e);
         }
     }
 
@@ -117,7 +117,7 @@ public class ProductSearchService {
             values.add(FieldValue.of(cursor.id()));
             return values;
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid product search cursor", e);
+            throw new ProductSearchInvalidCursorException(e);
         }
     }
 
