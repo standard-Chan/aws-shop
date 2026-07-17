@@ -122,7 +122,11 @@ class RedisProductDetailCacheRepositoryTest {
     private RedisProductDetailCacheRepository repository() {
         return new RedisProductDetailCacheRepository(
                 redisTemplate,
-                new ProductDetailCacheProperties(true, CACHE_TTL)
+                new ProductDetailCacheProperties(
+                        true,
+                        CACHE_TTL,
+                        new ProductDetailCacheProperties.Async(2, 8, 1000)
+                )
         );
     }
 

@@ -22,6 +22,10 @@ app:
     detail-cache:
       enabled: false
       ttl: 1h
+      async:
+        core-pool-size: 2
+        max-pool-size: 8
+        queue-capacity: 1000
   analytics:
     kafka:
       enabled: false

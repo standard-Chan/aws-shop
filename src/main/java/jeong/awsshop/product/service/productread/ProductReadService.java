@@ -27,6 +27,7 @@ public class ProductReadService {
     private final ProductRepository productRepository;
     private final ProductDetailDbReader productDetailDbReader;
     private final ProductDetailCacheRepository productDetailCacheRepository;
+    private final ProductDetailCacheAsyncWriter productDetailCacheAsyncWriter;
     private final ProductDetailCacheProperties productDetailCacheProperties;
 
     /**
@@ -127,7 +128,7 @@ public class ProductReadService {
 
     private ProductDetailResponse readAndCacheProductDetail(Long id) {
         ProductDetailResponse response = productDetailDbReader.readProductDetail(id);
-        productDetailCacheRepository.save(id, response);
+        productDetailCacheAsyncWriter.saveAsync(id, response);
         return response;
     }
 

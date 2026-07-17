@@ -2,8 +2,6 @@ package jeong.awsshop.product.service.productread;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +35,9 @@ class ProductDetailCacheReadServiceTest {
     @Mock
     private ProductDetailCacheRepository productDetailCacheRepository;
 
+    @Mock
+    private ProductDetailCacheAsyncWriter productDetailCacheAsyncWriter;
+
     @Test
     @DisplayName("상품 상세 캐시가 OFF이면 캐시를 조회하지 않고 DB에서 바로 조회해야 한다")
     void should_read_from_db_without_cache_lookup_when_product_detail_cache_is_disabled() {
@@ -49,10 +50,11 @@ class ProductDetailCacheReadServiceTest {
         // When: 상품 상세를 조회한다
         ProductDetailResponse response = productReadService.getProductDetail(productId);
 
-        // Then: 캐시 repository를 호출하지 않고 DB 응답을 반환해야 한다
+        // Then: 캐시 조회/저장 없이 DB 응답을 반환해야 한다
         assertThat(response).isSameAs(dbResponse);
         verify(productDetailDbReader).readProductDetail(productId);
         verifyNoInteractions(productDetailCacheRepository);
+        verifyNoInteractions(productDetailCacheAsyncWriter);
     }
 
     @Test
@@ -72,11 +74,12 @@ class ProductDetailCacheReadServiceTest {
         assertThat(response).isSameAs(cachedResponse);
         verify(productDetailCacheRepository).findByProductId(productId);
         verifyNoInteractions(productDetailDbReader);
+        verifyNoInteractions(productDetailCacheAsyncWriter);
     }
 
     @Test
-    @DisplayName("상품 상세 캐시 MISS이면 DB 조회 후 캐시에 저장해야 한다")
-    void should_read_from_db_and_save_cache_when_cache_misses() {
+    @DisplayName("상품 상세 캐시 MISS이면 DB 조회 후 캐시 저장을 비동기로 요청해야 한다")
+    void should_read_from_db_and_request_async_cache_save_when_cache_misses() {
         // Given: 상세 캐시가 활성화되어 있고 캐시가 비어 있다
         Long productId = 9_000_000_000_000L;
         ProductDetailResponse dbResponse = detailResponse(productId);
@@ -88,10 +91,11 @@ class ProductDetailCacheReadServiceTest {
         // When: 상품 상세를 조회한다
         ProductDetailResponse response = productReadService.getProductDetail(productId);
 
-        // Then: DB 응답을 반환하고 캐시에 저장해야 한다
+        // Then: DB 응답을 반환하고 캐시 저장은 비동기로 요청해야 한다
         assertThat(response).isSameAs(dbResponse);
         verify(productDetailDbReader).readProductDetail(productId);
-        verify(productDetailCacheRepository).save(productId, dbResponse);
+        verify(productDetailCacheAsyncWriter).saveAsync(productId, dbResponse);
+        verify(productDetailCacheRepository, never()).save(productId, dbResponse);
     }
 
     @Test
@@ -105,10 +109,10 @@ class ProductDetailCacheReadServiceTest {
         when(productDetailDbReader.readProductDetail(productId))
                 .thenThrow(new ProductNotFoundException(productId));
 
-        // When & Then: 예외는 유지하고 캐시 저장은 하지 않아야 한다
+        // When & Then: 예외는 유지하고 캐시 저장은 요청하지 않아야 한다
         assertThatThrownBy(() -> productReadService.getProductDetail(productId))
                 .isInstanceOf(ProductNotFoundException.class);
-        verify(productDetailCacheRepository, never()).save(eq(productId), any(ProductDetailResponse.class));
+        verifyNoInteractions(productDetailCacheAsyncWriter);
     }
 
     private ProductReadService productReadService(boolean cacheEnabled) {
@@ -116,7 +120,12 @@ class ProductDetailCacheReadServiceTest {
                 productRepository,
                 productDetailDbReader,
                 productDetailCacheRepository,
-                new ProductDetailCacheProperties(cacheEnabled, Duration.ofHours(1))
+                productDetailCacheAsyncWriter,
+                new ProductDetailCacheProperties(
+                        cacheEnabled,
+                        Duration.ofHours(1),
+                        new ProductDetailCacheProperties.Async(2, 8, 1000)
+                )
         );
     }
 
