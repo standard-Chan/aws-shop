@@ -7,7 +7,7 @@ import {
 
 const SCENARIO_NAME = 'uniform';
 const DISTRIBUTION_NAME = 'uniform-random-all-products';
-const SUMMARY_FILE = 'k6/results/product-detail-cache-uniform-summary.json';
+const SUMMARY_FILE = __ENV.SUMMARY_FILE || 'k6/results/product-detail-cache-uniform-summary.json';
 
 export const options = createProductDetailOptions('product_detail_cache_uniform');
 
