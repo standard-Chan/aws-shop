@@ -5,9 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEST_DIR="$ROOT_DIR/k6/product-detail-cache"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 SCENARIO="${SCENARIO:-${1:-uniform}}"
-TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
 RESULT_DIR="${RESULT_DIR:-$TEST_DIR/results}"
 SAMPLE_INTERVAL_SECONDS="${MYSQL_SAMPLE_INTERVAL_SECONDS:-1}"
+TPS_VALUE="${TPS:-100}"
+DURATION_VALUE="${DURATION:-1m}"
+LOAD_LABEL="$(printf 'tps%s-duration%s' "$TPS_VALUE" "$DURATION_VALUE" | tr -c 'A-Za-z0-9._-' '-')"
 
 if ! command -v mysql >/dev/null 2>&1; then
   echo "mysql CLI가 필요합니다. mysql client를 설치한 뒤 다시 실행하세요." >&2
@@ -83,7 +85,7 @@ BEFORE_FILE="$TMP_DIR/mysql-before.ndjson"
 AFTER_FILE="$TMP_DIR/mysql-after.ndjson"
 SAMPLES_FILE="$TMP_DIR/mysql-samples.ndjson"
 K6_SUMMARY_FILE="$TMP_DIR/k6-summary.json"
-RESULT_FILE="$RESULT_DIR/${SCENARIO}-${TIMESTAMP}.json"
+RESULT_FILE="${RESULT_FILE:-$RESULT_DIR/${SCENARIO}-${LOAD_LABEL}.json}"
 SAMPLER_PID=""
 
 cleanup() {
@@ -198,7 +200,7 @@ sample_mysql() {
 
 echo "Product detail cache load test 시작"
 echo "- scenario: $SCENARIO"
-echo "- timestamp: $TIMESTAMP"
+echo "- load: $LOAD_LABEL"
 echo "- result: $RESULT_FILE"
 echo "- mysql: ${DB_USERNAME_VALUE}@${DB_HOST_VALUE}:${DB_PORT_VALUE}/${DB_NAME_VALUE}"
 
@@ -221,7 +223,7 @@ collect_snapshot "$AFTER_FILE"
 
 node "$TEST_DIR/build-result.js" \
   --scenario "$SCENARIO" \
-  --timestamp "$TIMESTAMP" \
+  --timestamp "$LOAD_LABEL" \
   --before "$BEFORE_FILE" \
   --after "$AFTER_FILE" \
   --samples "$SAMPLES_FILE" \
