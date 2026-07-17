@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
-OUTPUT_FILE="${OUTPUT_FILE:-$ROOT_DIR/k6/test-setting/product-detail-ids.csv}"
+OUTPUT_FILE="${OUTPUT_FILE:-$ROOT_DIR/k6/product-detail-cache/ids/product-ids.csv}"
 
 if ! command -v mysql >/dev/null 2>&1; then
   echo "mysql CLI가 필요합니다. mysql client를 설치한 뒤 다시 실행하세요." >&2

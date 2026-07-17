@@ -52,3 +52,5 @@ aws-dataset/*.json
 logs/
 docs/
 k6/results
+k6/product-detail-cache/ids/*.csv
+k6/test-setting/ids/*.csv
