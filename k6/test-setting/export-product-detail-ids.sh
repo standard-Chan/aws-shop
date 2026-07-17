@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
-OUTPUT_FILE="${OUTPUT_FILE:-$ROOT_DIR/k6/results/product-detail-ids.csv}"
-LIMIT="${LIMIT:-500000}"
+OUTPUT_FILE="${OUTPUT_FILE:-$ROOT_DIR/k6/test-setting/product-detail-ids.csv}"
 
 if ! command -v mysql >/dev/null 2>&1; then
   echo "mysql CLI가 필요합니다. mysql client를 설치한 뒤 다시 실행하세요." >&2
@@ -48,17 +47,12 @@ if [ -z "$DB_HOST_VALUE" ] || [ -z "$DB_NAME_VALUE" ] || [ -z "$DB_USERNAME_VALU
   exit 1
 fi
 
-if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [ "$LIMIT" -le 0 ]; then
-  echo "LIMIT은 양의 정수여야 합니다: $LIMIT" >&2
-  exit 1
-fi
-
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 
 echo "Product ID 추출 시작"
 echo "- env: $ENV_FILE"
 echo "- db: ${DB_USERNAME_VALUE}@${DB_HOST_VALUE}:${DB_PORT_VALUE}/${DB_NAME_VALUE}"
-echo "- limit: $LIMIT"
+echo "- query: SELECT id FROM product ORDER BY id ASC"
 echo "- output: $OUTPUT_FILE"
 
 MYSQL_PWD="$DB_PASSWORD_VALUE" mysql \
@@ -71,7 +65,7 @@ MYSQL_PWD="$DB_PASSWORD_VALUE" mysql \
   --raw \
   --skip-column-names \
   --quick \
-  --execute="SELECT id FROM product ORDER BY id ASC LIMIT ${LIMIT};" \
+  --execute="SELECT id FROM product ORDER BY id ASC;" \
   > "$OUTPUT_FILE"
 
 LINE_COUNT="$(wc -l < "$OUTPUT_FILE" | tr -d ' ')"
@@ -80,7 +74,3 @@ echo "Product ID 추출 완료"
 echo "- rows: $LINE_COUNT"
 echo "- sample:"
 sed -n '1,5p' "$OUTPUT_FILE"
-
-if [ "$LINE_COUNT" -ne "$LIMIT" ]; then
-  echo "경고: 요청한 LIMIT($LIMIT)과 추출 row 수($LINE_COUNT)가 다릅니다." >&2
-fi
