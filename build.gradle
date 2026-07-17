@@ -24,6 +24,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'        // 웹 애플리케이션 개발 (REST API, MVC)
     implementation 'com.fasterxml.jackson.core:jackson-databind'              // JSON 파싱을 위한 ObjectMapper
     implementation 'org.springframework.boot:spring-boot-starter-validation' // 입력 데이터 검증 (Bean Validation API)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis' // 상품 상세 캐시용 Redis 연동
     implementation 'org.springframework.kafka:spring-kafka'                  // 사용자 행동 이벤트 Kafka 발행
     implementation 'co.elastic.clients:elasticsearch-java:8.13.4'             // 상품 검색용 Elasticsearch Java API Client
     implementation 'org.elasticsearch.client:elasticsearch-rest-client:8.13.4' // ES low-level REST client

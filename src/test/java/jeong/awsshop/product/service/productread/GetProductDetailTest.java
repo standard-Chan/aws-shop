@@ -23,7 +23,6 @@ import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductFeatureDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductImageDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductVideoDetailProjection;
-import jeong.awsshop.product.service.productread.ProductReadService;
 import jeong.awsshop.product.service.productread.dto.ProductDetailResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,7 +56,7 @@ class GetProductDetailTest {
     private ProductVideoRepository productVideoRepository;
 
     @InjectMocks
-    private ProductReadService productReadService;
+    private ProductDetailDbReader productDetailDbReader;
 
     @Test
     @DisplayName("상품 상세 조회 시 Product 본문과 모든 child collection을 조립해야 한다")
@@ -68,7 +67,7 @@ class GetProductDetailTest {
         stubAllChildren(productId);
 
         // When: Product 상세 정보를 조회한다
-        ProductDetailResponse response = productReadService.getProductDetail(productId);
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(productId);
 
         // Then: Product 본문 필드는 모두 응답에 포함되어야 한다
         assertThat(response.id()).isEqualTo(String.valueOf(productId));
@@ -96,7 +95,7 @@ class GetProductDetailTest {
         when(productRepository.findDetailById(productId)).thenReturn(Optional.empty());
 
         // When & Then: 없는 Product는 상세 조회 실패 예외로 처리해야 한다
-        assertThatThrownBy(() -> productReadService.getProductDetail(productId))
+        assertThatThrownBy(() -> productDetailDbReader.readProductDetail(productId))
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
@@ -109,7 +108,7 @@ class GetProductDetailTest {
         stubEmptyChildren(productId);
 
         // When: Product 상세 정보를 조회한다
-        ProductDetailResponse response = productReadService.getProductDetail(productId);
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(productId);
 
         // Then: 모든 child collection은 빈 list로 정규화되어야 한다
         assertThat(response.features()).isEmpty();
@@ -129,7 +128,7 @@ class GetProductDetailTest {
         stubEmptyChildren(productId);
 
         // When: Product 상세 정보를 조회한다
-        ProductDetailResponse response = productReadService.getProductDetail(productId);
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(productId);
 
         // Then: details는 null이 아니라 빈 map이어야 한다
         assertThat(response.details()).isEmpty();
@@ -144,7 +143,7 @@ class GetProductDetailTest {
         stubEmptyChildren(productId);
 
         // When: Product 상세 정보를 조회한다
-        ProductDetailResponse response = productReadService.getProductDetail(productId);
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(productId);
 
         // Then: blank details는 빈 map으로 정규화되어야 한다
         assertThat(response.details()).isEmpty();
@@ -159,7 +158,7 @@ class GetProductDetailTest {
         stubEmptyChildren(productId);
 
         // When: Product 상세 정보를 조회한다
-        ProductDetailResponse response = productReadService.getProductDetail(productId);
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(productId);
 
         // Then: details는 문자열이 아니라 JSON object 구조여야 한다
         assertThat(response.details())

@@ -17,6 +17,15 @@ spring:
     listener:
       auto-startup: false
 
+app:
+  product:
+    detail-cache:
+      enabled: false
+      ttl: 1h
+  analytics:
+    kafka:
+      enabled: false
+
 logging:
   level:
     root: warn

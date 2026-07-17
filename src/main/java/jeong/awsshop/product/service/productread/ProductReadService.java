@@ -4,18 +4,13 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
+import jeong.awsshop.product.config.ProductDetailCacheProperties;
 import jeong.awsshop.product.service.dataimport.MainCategoryNormalizer;
 import jeong.awsshop.product.exception.productread.MissingCategorySortCursorException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorMismatchException;
 import jeong.awsshop.product.exception.productread.ProductCategoryCursorNotFoundException;
-import jeong.awsshop.product.exception.productread.ProductNotFoundException;
-import jeong.awsshop.product.repository.ProductBoughtTogetherRepository;
-import jeong.awsshop.product.repository.ProductCategoryRepository;
-import jeong.awsshop.product.repository.ProductDescriptionRepository;
-import jeong.awsshop.product.repository.ProductFeatureRepository;
-import jeong.awsshop.product.repository.ProductImageRepository;
 import jeong.awsshop.product.repository.ProductRepository;
-import jeong.awsshop.product.repository.ProductVideoRepository;
+import jeong.awsshop.product.repository.cache.ProductDetailCacheRepository;
 import jeong.awsshop.product.repository.projection.ProductDetailProjection;
 import jeong.awsshop.product.repository.projection.ProductSummaryNativeProjection;
 import jeong.awsshop.product.service.productread.dto.ProductCategoryCursorResponse;
@@ -30,12 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductReadService {
 
     private final ProductRepository productRepository;
-    private final ProductFeatureRepository productFeatureRepository;
-    private final ProductDescriptionRepository productDescriptionRepository;
-    private final ProductCategoryRepository productCategoryRepository;
-    private final ProductBoughtTogetherRepository productBoughtTogetherRepository;
-    private final ProductImageRepository productImageRepository;
-    private final ProductVideoRepository productVideoRepository;
+    private final ProductDetailDbReader productDetailDbReader;
+    private final ProductDetailCacheRepository productDetailCacheRepository;
+    private final ProductDetailCacheProperties productDetailCacheProperties;
 
     /**
      * id 조회 cursor 목록 조회 결과를 응답 DTO로 반환한다.
@@ -124,21 +116,19 @@ public class ProductReadService {
     /**
      * Product id로 상세 조회 결과를 반환한다.
      */
-    @Transactional(readOnly = true)
     public ProductDetailResponse getProductDetail(Long id) {
-        ProductDetailProjection product = productRepository.findDetailById(id)
-                .orElseThrow(() -> new ProductNotFoundException(id));
+        if (!productDetailCacheProperties.enabled()) {
+            return productDetailDbReader.readProductDetail(id);
+        }
 
-        // 단일 쿼리가 아닌, 개별 쿼리로 연관 정보들을 각각 조회한다. (단일 JOIN 시, 지나치게 많은 rows 조회 문제)
-        return ProductDetailResponse.from(
-                product,
-                productFeatureRepository.findFeatureDetailsByProductId(id),
-                productDescriptionRepository.findDescriptionDetailsByProductId(id),
-                productCategoryRepository.findCategoryDetailsByProductId(id),
-                productBoughtTogetherRepository.findBoughtTogetherDetailsByProductId(id),
-                productImageRepository.findImageDetailsByProductId(id),
-                productVideoRepository.findVideoDetailsByProductId(id)
-        );
+        return productDetailCacheRepository.findByProductId(id)
+                .orElseGet(() -> readAndCacheProductDetail(id));
+    }
+
+    private ProductDetailResponse readAndCacheProductDetail(Long id) {
+        ProductDetailResponse response = productDetailDbReader.readProductDetail(id);
+        productDetailCacheRepository.save(id, response);
+        return response;
     }
 
     /**
