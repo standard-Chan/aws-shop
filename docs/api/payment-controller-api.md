@@ -101,14 +101,19 @@ curl -X POST \
 | `paymentKey` | string | Y | 외부 결제사 결제 키 |
 | `orderId` | long | Y | 주문 ID |
 | `amount` | number | Y | 승인 요청 금액 |
+| `productId` | long | Y | 재고를 예약할 상품 ID |
+| `quantity` | int | Y | 예약할 상품 수량 |
 
 ### 동작 메모
 
-- controller는 요청 본문을 `TossPaymentConfirmRequest`로 받아 `PaymentService.confirmPayment()`에 전달한다.
+- controller는 요청 본문을 `ConfirmPaymentRequest`로 받아 `PaymentService.confirmPayment()`에 전달한다.
 - service는 먼저 `paymentId`로 내부 결제 정보를 조회한다.
 - 승인 시작 시 내부 결제 상태를 진행 중으로 변경한 뒤, 주문 ID와 금액을 검증한다.
-- 검증 후 Toss 결제 승인 API를 호출하고, 성공 시 결제 상태를 완료로 변경한다.
+- 검증 후 `StockService.decrease(productId, quantity)`로 재고를 예약한다.
+- 재고 예약이 성공하면 Toss 결제 승인 API를 호출하고, 성공 시 결제 상태를 완료로 변경한다.
 - 승인 성공 후 주문 서비스에 완료 상태 업데이트를 요청한다.
+- 재고 예약 실패 시 Toss 결제 승인 API를 호출하지 않고 내부 결제 상태를 실패로 변경한다.
+- 재고 예약 이후 승인 실패가 발생하면 `StockService.increase(productId, quantity)`로 예약 수량을 복구한다.
 - 승인 실패 시 내부 결제 상태를 실패로 변경하고 주문 서비스에 pending 상태 업데이트를 요청한 뒤 예외를 다시 던진다.
 
 ### 요청 예시
@@ -118,7 +123,9 @@ curl -X POST \
   "paymentId": 1,
   "paymentKey": "payment-key-1",
   "orderId": 123,
-  "amount": 100.00
+  "amount": 100.00,
+  "productId": 10,
+  "quantity": 2
 }
 ```
 
@@ -158,7 +165,9 @@ curl -X POST \
     "paymentId": 1,
     "paymentKey": "payment-key-1",
     "orderId": 123,
-    "amount": 100.00
+    "amount": 100.00,
+    "productId": 10,
+    "quantity": 2
   }'
 ```
 
@@ -167,4 +176,4 @@ curl -X POST \
 | 상태 코드 | 설명 |
 | --- | --- |
 | `200 OK` | 결제 승인 성공 |
-| `5xx` | 결제 조회 실패, 주문 ID/금액 검증 실패, 외부 결제 승인 실패, 주문 상태 업데이트 실패 등 런타임 예외 발생 |
+| `5xx` | 결제 조회 실패, 주문 ID/금액 검증 실패, 재고 예약 실패, 외부 결제 승인 실패, 주문 상태 업데이트 실패 등 런타임 예외 발생 |
