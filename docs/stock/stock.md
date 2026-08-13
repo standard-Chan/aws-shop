@@ -28,6 +28,13 @@
 - `StockService.increase(Long productId, int quantity)`: 특정 상품 재고를 추가하고 변경 후 재고를 반환한다.
 - 서비스 응답은 `StockResponse(productId, quantity)`다.
 
+## API 계약
+- `POST /api/stocks/{productId}/decrease`: 요청 본문 `quantity`만큼 해당 상품 재고를 차감한다.
+- `POST /api/stocks/{productId}/increase`: 요청 본문 `quantity`만큼 해당 상품 재고를 추가한다.
+- 요청 본문은 `StockQuantityRequest(quantity)`다.
+- 응답 본문은 `StockResponse(productId, quantity)`다.
+- 상세 요청/응답 예시는 [../api/stock-controller-api.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/api/stock-controller-api.md)를 따른다.
+
 ## 예외 기준
 - `InvalidStockQuantityException`: 재고 변경 수량이 0 이하일 때
 - `StockNotFoundException`: 차감 대상 재고 row가 없을 때
@@ -47,4 +54,4 @@
 - domain 테스트는 재고 추가, 차감, 음수 방지, 부족 예외, overflow 예외를 검증한다.
 - service 테스트는 재고 차감 성공, 재고 없음, 재고 부족, 재고 추가, 재고 row 생성, 상품 없음 예외를 검증한다.
 - repository 테스트는 조건부 차감 update와 부족 시 수량 불변식을 검증한다.
-- controller 테스트는 API가 추가될 때 관리 API의 요청 검증, 응답 코드, 예외 매핑을 검증한다.
+- controller 테스트는 재고 차감/추가 요청 위임, 응답 JSON, 예외별 HTTP 상태 코드 매핑을 검증한다.
