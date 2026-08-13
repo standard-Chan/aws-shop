@@ -3,6 +3,7 @@ package jeong.awsshop.payment.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -10,10 +11,14 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
+import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
@@ -21,18 +26,22 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCancele
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
-import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
+import jeong.awsshop.payment.infrastructure.order.OrderClient;
+import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
+import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
+import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
+import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.exception.InsufficientStockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -51,11 +60,20 @@ class PaymentServiceTest {
     @Mock
     private SnowflakeIdGenerator snowflakeIdGenerator;
 
+    @Mock
+    private StockService stockService;
+
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentService(orderClient, paymentRepository, tossPaymentClient, snowflakeIdGenerator);
+        paymentService = new PaymentService(
+            orderClient,
+            paymentRepository,
+            tossPaymentClient,
+            snowflakeIdGenerator,
+            stockService
+        );
     }
 
     @Test
@@ -294,6 +312,73 @@ class PaymentServiceTest {
             .hasMessage("save failed");
     }
 
+    @Test
+    @DisplayName("결제 승인 전에 재고를 예약하고 승인 성공 시 결제와 주문을 완료해야 한다")
+    void should_reserve_stock_before_toss_confirm_and_complete_payment() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+
+        // When
+        TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
+
+        // Then
+        assertThat(response).isEqualTo(tossResponse);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(stockService, never()).increase(10L, 2);
+        verify(orderClient).updateCompleteOrder(123L);
+        verify(paymentRepository).save(payment);
+
+        InOrder inOrder = inOrder(stockService, tossPaymentClient);
+        inOrder.verify(stockService).decrease(10L, 2);
+        inOrder.verify(tossPaymentClient).confirm(any());
+    }
+
+    @Test
+    @DisplayName("재고 예약이 실패하면 Toss 승인 요청 없이 결제를 실패 처리해야 한다")
+    void should_fail_payment_without_toss_confirm_when_stock_reservation_fails() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(stockService.decrease(10L, 2)).thenThrow(new InsufficientStockException(10L, 2, 0));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentConfirmExternalException.class)
+            .hasRootCauseInstanceOf(InsufficientStockException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(stockService, never()).increase(10L, 2);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    @DisplayName("재고 예약 후 결제 승인이 실패하면 예약 재고를 복구해야 한다")
+    void should_restore_reserved_stock_when_toss_confirm_fails_after_stock_reservation() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        PaymentException tossException = new PaymentException("psp confirm failed");
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(tossPaymentClient.confirm(any())).thenThrow(tossException);
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentConfirmExternalException.class)
+            .hasRootCauseMessage("psp confirm failed");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(stockService).increase(10L, 2);
+        verify(paymentRepository).save(payment);
+    }
+
     private OrderSummary createOrderSummary(Long orderId, BigDecimal totalPrice) {
         return new OrderSummary(
             orderId,
@@ -301,6 +386,40 @@ class PaymentServiceTest {
             jeong.awsshop.order.domain.OrderStatus.EXECUTING,
             totalPrice,
             "Seoul"
+        );
+    }
+
+    private Payment notStartedPayment(Long paymentId, Long orderId, BigDecimal amount) {
+        return Payment.builder()
+            .id(paymentId)
+            .orderId(orderId)
+            .status(PaymentStatus.NOT_STARTED)
+            .amount(amount)
+            .createdAt(LocalDateTime.now().minusMinutes(1))
+            .expiresAt(LocalDateTime.now().plusMinutes(4))
+            .build();
+    }
+
+    private ConfirmPaymentRequest confirmRequest() {
+        return new ConfirmPaymentRequest(
+            "payment-key-1",
+            1L,
+            123L,
+            new BigDecimal("140000.00"),
+            10L,
+            2
+        );
+    }
+
+    private TossPaymentConfirmResponse tossConfirmResponse() {
+        return new TossPaymentConfirmResponse(
+            "payment-key-1",
+            "123",
+            "CARD",
+            "DONE",
+            140000L,
+            OffsetDateTime.parse("2026-05-25T10:15:30+09:00"),
+            OffsetDateTime.parse("2026-05-25T10:16:00+09:00")
         );
     }
 }

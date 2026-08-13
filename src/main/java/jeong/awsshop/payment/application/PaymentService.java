@@ -19,6 +19,8 @@ import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRe
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
+import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.exception.StockException;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final TossPaymentClient tossPaymentClient;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
+    private final StockService stockService;
 
     /**
      * 주문 id에 해당하는 결제를 생성하여 반환한다.
@@ -131,11 +134,16 @@ public class PaymentService {
 
         // 결제 승인 처리 시작. 상태 등록
         payment.start(confirmRequest.paymentKey());
+        boolean stockReserved = false;
 
         try {
             // 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
+
+            // 재고 예약 처리
+            stockService.decrease(confirmRequest.productId(), confirmRequest.quantity());
+            stockReserved = true;
 
             // TODO : 주문 상태 검증
             // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
@@ -155,11 +163,9 @@ public class PaymentService {
             // Order 완료 처리
             orderClient.updateCompleteOrder(payment.getOrderId());
 
-            // TODO : 재고 감소 처리
-
             paymentRepository.save(payment);
             return response;
-        } catch (PaymentException exception) {
+        } catch (PaymentException | StockException exception) {
             // 해당 결제 실패 처리
             payment.fail();
             paymentRepository.save(payment);
@@ -167,7 +173,9 @@ public class PaymentService {
             // Order 상태 pending 변경
             orderClient.updatePendingOrder(payment.getOrderId());
 
-            // TODO : 만약 재고가 감소된 상태라면, 재고 복구 처리 (재고 감소가 마지막이므로 로직상 문제가 없다면, 재고 감소가 실패한 경우는 없을 것이다.)
+            if (stockReserved) {
+                stockService.increase(confirmRequest.productId(), confirmRequest.quantity());
+            }
 
             log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
