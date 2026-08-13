@@ -109,7 +109,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders/4/executing"))
             .andExpect(status().isConflict())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                .string(OrderController.ORDER_STATUS_HEADER, "EXECUTING"))
+                .string(OrderExceptionHandler.ORDER_STATUS_HEADER, "EXECUTING"))
             .andExpect(content().string("[Order] Order is already EXECUTING. id=4"));
     }
 
@@ -133,7 +133,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders/5/executing"))
             .andExpect(status().isConflict())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                .string(OrderController.ORDER_STATUS_HEADER, "COMPLETED"))
+                .string(OrderExceptionHandler.ORDER_STATUS_HEADER, "COMPLETED"))
             .andExpect(content().string("[Order] Completed order cannot be updated to EXECUTING. id=5"));
     }
 
@@ -146,7 +146,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders/6/executing"))
             .andExpect(status().isConflict())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                .string(OrderController.ORDER_STATUS_HEADER, "CANCELED"))
+                .string(OrderExceptionHandler.ORDER_STATUS_HEADER, "CANCELED"))
             .andExpect(content().string("[Order] CANCELED order cannot be updated. id=6"));
     }
 
@@ -159,7 +159,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders/7/executing"))
             .andExpect(status().isGone())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                .string(OrderController.ORDER_STATUS_HEADER, "EXPIRED"))
+                .string(OrderExceptionHandler.ORDER_STATUS_HEADER, "EXPIRED"))
             .andExpect(content().string("[Order] EXPIRED order cannot be updated. id=7"));
     }
 
