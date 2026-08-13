@@ -1,0 +1,17 @@
+### stock 재고 차감
+# StockController가 추가되면 실제 URL 계약에 맞춰 경로를 확정한다.
+POST http://localhost:8080/api/stocks/10/decrease
+Content-Type: application/json
+
+{
+  "quantity": 2
+}
+
+### stock 재고 추가
+# StockController가 추가되면 실제 URL 계약에 맞춰 경로를 확정한다.
+POST http://localhost:8080/api/stocks/10/increase
+Content-Type: application/json
+
+{
+  "quantity": 5
+}
