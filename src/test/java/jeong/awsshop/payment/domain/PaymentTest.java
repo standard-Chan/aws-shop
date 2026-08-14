@@ -58,6 +58,25 @@ class PaymentTest {
             .isInstanceOf(PaymentInvalidStatusException.class);
     }
 
+    @Test
+    @DisplayName("활성 결제는 만료 처리할 수 있어야 한다")
+    void should_expire_active_payment() {
+        Payment payment = payment(PaymentStatus.NOT_STARTED);
+
+        payment.expire();
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("이미 종료된 결제는 만료 처리할 수 없어야 한다")
+    void should_reject_expire_when_payment_is_already_finished() {
+        Payment payment = payment(PaymentStatus.SUCCESS);
+
+        assertThatThrownBy(payment::expire)
+            .isInstanceOf(PaymentInvalidStatusException.class);
+    }
+
     private Payment payment(PaymentStatus status) {
         return Payment.builder()
             .id(1L)

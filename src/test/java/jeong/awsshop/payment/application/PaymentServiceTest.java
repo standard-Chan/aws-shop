@@ -20,6 +20,7 @@ import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
+import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
@@ -361,6 +362,30 @@ class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("만료된 결제 승인 요청은 결제를 만료 처리하고 주문을 pending으로 되돌린 뒤 외부 처리를 시작하지 않아야 한다")
+    void should_expire_payment_and_restore_order_to_pending_without_external_processing_when_confirm_payment_is_expired() {
+        // Given
+        Payment payment = expiredPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentExpiredException.class)
+            .hasMessage("[Payment] 결제가 만료되었습니다. orderId=123, paymentId=1");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(payment.getPaymentKey()).isNull();
+        verify(paymentRepository).save(payment);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(orderClient, never()).getOrder(123L);
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockService, never()).increase(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+    }
+
+    @Test
     @DisplayName("재고 예약이 실패하면 Toss 승인 요청 없이 결제를 실패 처리해야 한다")
     void should_fail_payment_without_toss_confirm_when_stock_reservation_fails() {
         // Given
@@ -484,6 +509,17 @@ class PaymentServiceTest {
             .amount(amount)
             .createdAt(LocalDateTime.now().minusMinutes(1))
             .expiresAt(LocalDateTime.now().plusMinutes(4))
+            .build();
+    }
+
+    private Payment expiredPayment(Long paymentId, Long orderId, BigDecimal amount) {
+        return Payment.builder()
+            .id(paymentId)
+            .orderId(orderId)
+            .status(PaymentStatus.NOT_STARTED)
+            .amount(amount)
+            .createdAt(LocalDateTime.now().minusMinutes(10))
+            .expiresAt(LocalDateTime.now().minusMinutes(1))
             .build();
     }
 

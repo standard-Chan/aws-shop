@@ -249,4 +249,26 @@ class PaymentControllerTest {
             .hasCauseInstanceOf(PaymentConfirmExternalException.class)
             .hasRootCauseMessage("psp confirm failed");
     }
+
+    @Test
+    @DisplayName("만료된 결제 승인 요청이면 HTTP 410을 반환해야 한다")
+    void should_return_gone_when_confirm_payment_is_expired() throws Exception {
+        // Given
+        when(paymentService.confirmPayment(any(ConfirmPaymentRequest.class)))
+            .thenThrow(new PaymentExpiredException(123L, 1L));
+
+        // When, Then
+        mockMvc.perform(post("/api/payments/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "paymentId": 1,
+                      "paymentKey": "payment-key-1",
+                      "orderId": 123,
+                      "amount": 100
+                    }
+                    """))
+            .andExpect(status().isGone())
+            .andExpect(content().string("[Payment] 결제가 만료되었습니다. orderId=123, paymentId=1"));
+    }
 }

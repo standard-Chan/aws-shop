@@ -1,11 +1,14 @@
 package jeong.awsshop.payment.application;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
+import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
@@ -20,8 +23,6 @@ import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
 import jeong.awsshop.stock.application.StockService;
 import jeong.awsshop.stock.exception.StockException;
-import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -120,6 +121,13 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
+        if (payment.isExpired(LocalDateTime.now())) {
+            payment.expire();
+            paymentRepository.save(payment);
+            orderClient.updatePendingOrder(payment.getOrderId());
+            throw new PaymentExpiredException(payment.getOrderId(), payment.getId());
+        }
+
         // 결제 승인 처리 시작. 상태 등록
         payment.start(confirmRequest.paymentKey());
         List<OrderLineSummary> reservedLines = List.of();
@@ -137,7 +145,6 @@ public class PaymentService {
             // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
             // (실제 서비스에서는 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오지 않도록 프론트엔드에서 막는 것이 좋다.)
 
-            // toss 결제 승인 요청
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
                     confirmRequest.paymentKey(), confirmRequest.amount()));

@@ -18,7 +18,8 @@
 - `POST /api/payments`: `orders` row에 쓰기 락을 걸고 멱등키를 생성한 뒤 `Order.idempotencyKeys` 1:N 컬렉션에 추가하고 `Payment`를 저장한다.
 - 동일한 `orderId`로 결제 생성 요청이 다시 들어오면 기존 활성 결제(`NOT_STARTED`, `EXECUTING`)를 `FAILED`로 변경한 뒤 새 `Payment`를 생성한다.
 - 같은 주문의 실패/성공 결제 이력을 보존하기 위해 `payment.order_id`는 unique가 아니다.
-- `POST /api/payments/confirm`: 요청의 `paymentKey`를 내부 `Payment`에 기록하고, `orderId`로 주문 라인을 조회해 모든 상품 재고를 예약한 뒤 `TossPaymentClient.confirm()` 결과를 그대로 반환한다.
+- `POST /api/payments/confirm`: 결제 만료 여부를 먼저 확인하고, 유효한 결제에 한해 요청의 `paymentKey`를 내부 `Payment`에 기록한 뒤 `orderId`로 주문 라인을 조회해 모든 상품 재고를 예약하고 `TossPaymentClient.confirm()` 결과를 그대로 반환한다.
+- confirm 진입 시점에 `expiresAt <= now`이면 해당 결제를 `EXPIRED`로 저장하고 주문을 `PENDING`으로 되돌린 뒤 `PaymentExpiredException`을 던진다. 이때 재고 예약, Toss 승인, 주문 완료 처리는 실행하지 않는다.
 - 현재 요청 DTO에는 Bean Validation이 없어 `orderId` 누락, 금액 불일치 같은 입력 검증은 아직 명시적으로 보장되지 않는다.
 
 ## `POST /api/payments/confirm`의 `paymentKey`
@@ -26,6 +27,7 @@
 - `paymentKey`는 결제 승인 시도를 분류하는 키이며, 중복 사용을 허용하지 않는다.
 - 같은 `paymentKey`가 다시 들어온 요청은 같은 승인 시도의 중복 요청으로 보아야 하므로, `paymentKey`는 결제 승인 멱등키 역할을 한다.
 - 서버는 `ConfirmPaymentRequest.paymentKey`를 받아 `Payment.start(paymentKey)`에서 공백/null 검증 후 `Payment.paymentKey`에 저장한다.
+- 결제 만료 검사는 `Payment.start(paymentKey)`보다 먼저 실행한다. 따라서 만료된 confirm 요청은 `paymentKey`를 저장하지 않고 상태도 `EXECUTING`으로 바꾸지 않는다.
 - 서버는 요청의 `productId`, `quantity`를 받지 않고, `orderId`로 조회한 주문 라인의 모든 `productId`, `quantity`를 구매 처리 대상으로 사용한다.
 - 이후 `PaymentService.confirmPayment()`는 `new TossPaymentConfirmRequest(confirmRequest.paymentId(), confirmRequest.paymentKey(), confirmRequest.amount())`를 만들어 Toss Payments 승인 API(`/v1/payments/confirm`)로 보낸다.
 - 이때 `TossPaymentConfirmRequest.orderId`에는 내부 `paymentId`가 들어간다. 코드 주석상 현재 시스템에서는 내부 `paymentId`를 Toss의 `orderId`로 사용한다.
