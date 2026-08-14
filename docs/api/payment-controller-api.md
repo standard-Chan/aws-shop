@@ -37,6 +37,8 @@
 
 - controller는 요청 본문을 `CreatePaymentRequest`로 받아 `PaymentService.createPayment()`에 전달한다.
 - service는 주문 서비스를 조회해 주문 총액을 확인한 뒤 `Payment` 엔티티를 생성한다.
+- 같은 `orderId`에 기존 활성 결제(`NOT_STARTED`, `EXECUTING`)가 있으면 기존 활성 결제를 `FAILED`로 변경하고 새 결제를 생성한다.
+- 기존 `FAILED`, `EXPIRED`, `SUCCESS` 결제는 이력 보존을 위해 변경하지 않는다.
 - 생성되는 결제 상태는 `NOT_STARTED`다.
 - 응답의 `amount`는 요청 본문이 아니라 주문 서비스에서 조회한 주문 총액이다.
 

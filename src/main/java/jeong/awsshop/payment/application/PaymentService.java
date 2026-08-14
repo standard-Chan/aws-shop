@@ -5,10 +5,8 @@ import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
-import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
-import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
@@ -26,7 +24,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -50,14 +47,11 @@ public class PaymentService {
      * 주문 id에 해당하는 결제를 생성하여 반환한다.
      * 목표 플로우:
      * 1) Order 상태를 통해 결제 생성 진입을 점유한다.
-     * 2) 이미 처리 중인 상태라면, 기존 Payment를 조회해 만료 여부를 판단한다.
-     * 3) 만료되지 않았다면 기존 Payment를 반환한다.
-     * 4) 만료되었으면 만료 응답을 반환한다.
-     * 5) 처리 중 Payment가 없으면 장애 복구 후 에러를 반환한다.
+     * 2) 이미 처리 중인 상태라면, 기존 활성 Payment를 실패 처리한다.
+     * 3) 새 Payment를 생성해 실패/성공 이력을 모두 보존한다.
      *
      * 의도:
-     * Payment 생성은 updateExecutingStatus 성공 경로에서만 수행한다.
-     * order 가 EXECUTING 이라는 사실만으로 중복 결제라고 단정하지 않고, payment 데이터와 함께 재사용/만료/복구 필요 여부를 판단한다.
+     * 같은 주문의 결제 실패 내역을 덮어쓰거나 재사용하지 않고, 매 생성 요청마다 새 Payment row를 남긴다.
      *
      * @param request
      * @return psp 결제 URL
@@ -71,14 +65,33 @@ public class PaymentService {
         try {
             order = orderClient.updateExecutingStatus(request.orderId());
         } catch (PaymentOrderAlreadyExecutingException exception) {
-            return resolveAlreadyExecutingPayment(request.orderId());
+            order = getOrderForRetry(request.orderId());
         } catch (PaymentException exception) {
             throw exception;
         } catch (RuntimeException exception) {
             throw new PaymentOrderLookupException(request.orderId(), exception);
         }
 
+        failActivePayments(order.orderId());
         return createNewPayment(order);
+    }
+
+    private OrderSummary getOrderForRetry(Long orderId) {
+        try {
+            return orderClient.getOrder(orderId);
+        } catch (PaymentException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new PaymentOrderLookupException(orderId, exception);
+        }
+    }
+
+    private void failActivePayments(Long orderId) {
+        List<Payment> activePayments = paymentRepository.findAllByOrderIdAndStatusIn(orderId, ACTIVE_PAYMENT_STATUSES);
+        for (Payment activePayment : activePayments) {
+            activePayment.fail();
+        }
+        paymentRepository.saveAll(activePayments);
     }
 
     private PaymentResponse createNewPayment(OrderSummary order) {
@@ -92,33 +105,7 @@ public class PaymentService {
             .expiresAt(createdAt.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
             .build();
 
-        try {
-            return PaymentResponse.from(paymentRepository.save(payment));
-        } catch (DataIntegrityViolationException exception) {
-            return resolveAlreadyExecutingPayment(order.orderId());
-        }
-    }
-
-    private PaymentResponse resolveAlreadyExecutingPayment(Long orderId) {
-        List<Payment> activePayments = paymentRepository.findAllByOrderIdAndStatusIn(orderId, ACTIVE_PAYMENT_STATUSES);
-
-        if (activePayments.size() > 1) {
-            throw new PaymentException("[Payment] 처리 중인 결제가 2개 이상 존재합니다. orderId=" + orderId);
-        }
-
-        if (activePayments.isEmpty()) {
-            orderClient.updatePendingOrder(orderId);
-            throw new PaymentRecoveryRequiredException(orderId);
-        }
-
-        Payment payment = activePayments.get(0);
-        if (payment.isExpired(LocalDateTime.now())) {
-            payment.expire();
-            paymentRepository.save(payment);
-            throw new PaymentExpiredException(orderId, payment.getId());
-        }
-
-        return PaymentResponse.from(payment);
+        return PaymentResponse.from(paymentRepository.save(payment));
     }
 
     /**

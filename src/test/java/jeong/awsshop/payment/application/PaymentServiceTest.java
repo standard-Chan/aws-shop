@@ -19,9 +19,7 @@ import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
-import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentException;
-import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
@@ -83,6 +81,9 @@ class PaymentServiceTest {
         // Given
         // 주문 조회 결과와 저장된 결제 엔티티를 준비한다.
         when(orderClient.updateExecutingStatus(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
+        when(paymentRepository.findAllByOrderIdAndStatusIn(
+            123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
+            .thenReturn(List.of());
         when(snowflakeIdGenerator.nextId()).thenReturn(1L);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
             Payment payment = invocation.getArgument(0);
@@ -179,12 +180,13 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("주문 executing 갱신이 이미 진행 중 예외를 반환하고 활성 결제가 만료되지 않았으면 기존 결제를 반환해야 한다")
-    void should_return_existing_active_payment_when_order_is_already_executing() {
+    @DisplayName("주문이 이미 처리 중이면 기존 활성 결제를 실패 처리하고 새 결제를 생성해야 한다")
+    void should_fail_existing_active_payment_and_create_new_payment_when_order_is_already_executing() {
         // Given
         when(orderClient.updateExecutingStatus(123L)).thenThrow(
             new PaymentOrderAlreadyExecutingException(123L, new RuntimeException("already executing"))
         );
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
         Payment activePayment = Payment.builder()
             .id(55L)
             .orderId(123L)
@@ -196,79 +198,86 @@ class PaymentServiceTest {
         when(paymentRepository.findAllByOrderIdAndStatusIn(
             123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
             .thenReturn(List.of(activePayment));
+        when(snowflakeIdGenerator.nextId()).thenReturn(56L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         PaymentResponse response = paymentService.createPayment(new CreatePaymentRequest(123L));
 
         // Then
-        assertThat(response.paymentId()).isEqualTo("55");
+        assertThat(activePayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(response.paymentId()).isEqualTo("56");
         assertThat(response.orderId()).isEqualTo(123L);
         assertThat(response.status()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(response.amount()).isEqualByComparingTo("100.00");
-        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentRepository).saveAll(List.of(activePayment));
     }
 
     @Test
-    @DisplayName("활성 결제가 만료되었으면 만료 처리 후 만료 예외를 반환해야 한다")
-    void should_expire_existing_payment_and_throw_expired_exception_when_active_payment_is_expired() {
+    @DisplayName("기존 만료 결제는 변경하지 않고 새 결제를 생성해야 한다")
+    void should_create_new_payment_without_changing_expired_payment() {
         // Given
         when(orderClient.updateExecutingStatus(123L))
             .thenThrow(new PaymentOrderAlreadyExecutingException(123L, new RuntimeException("already executing")))
             ;
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
         Payment expiredPayment = Payment.builder()
             .id(55L)
             .orderId(123L)
-            .status(PaymentStatus.NOT_STARTED)
+            .status(PaymentStatus.EXPIRED)
             .amount(new BigDecimal("100.00"))
             .createdAt(LocalDateTime.now().minusMinutes(10))
             .expiresAt(LocalDateTime.now().minusMinutes(5))
             .build();
         when(paymentRepository.findAllByOrderIdAndStatusIn(
             123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
-            .thenReturn(List.of(expiredPayment));
+            .thenReturn(List.of());
+        when(snowflakeIdGenerator.nextId()).thenReturn(56L);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        // Then
-        assertThatThrownBy(() -> paymentService.createPayment(new CreatePaymentRequest(123L)))
-            .isInstanceOf(PaymentExpiredException.class)
-            .hasMessage("[Payment] 결제가 만료되었습니다. orderId=123, paymentId=55");
+        PaymentResponse response = paymentService.createPayment(new CreatePaymentRequest(123L));
 
+        // Then
         assertThat(expiredPayment.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
-        verify(orderClient, times(1)).updateExecutingStatus(123L);
+        assertThat(response.paymentId()).isEqualTo("56");
+        assertThat(response.status()).isEqualTo(PaymentStatus.NOT_STARTED);
         verify(orderClient, never()).updatePendingOrder(123L);
-        verify(paymentRepository, times(1)).save(expiredPayment);
+        verify(paymentRepository, times(1)).save(any(Payment.class));
     }
 
     @Test
-    @DisplayName("주문은 executing 이지만 활성 결제가 없으면 강제 복구 후 재시도 예외를 반환해야 한다")
-    void should_recover_and_throw_retryable_exception_when_active_payment_is_missing() {
+    @DisplayName("주문은 executing 이지만 활성 결제가 없어도 새 결제를 생성해야 한다")
+    void should_create_new_payment_when_active_payment_is_missing() {
         // Given
         when(orderClient.updateExecutingStatus(123L))
             .thenThrow(new PaymentOrderAlreadyExecutingException(123L, new RuntimeException("already executing")))
             ;
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
         when(paymentRepository.findAllByOrderIdAndStatusIn(
             123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
             .thenReturn(List.of());
+        when(snowflakeIdGenerator.nextId()).thenReturn(56L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        // Then
-        assertThatThrownBy(() -> paymentService.createPayment(new CreatePaymentRequest(123L)))
-            .isInstanceOf(PaymentRecoveryRequiredException.class)
-            .hasMessage("[Payment] 결제 처리 상태를 복구했습니다. 다시 시도해주세요. orderId=123");
+        PaymentResponse response = paymentService.createPayment(new CreatePaymentRequest(123L));
 
-        verify(orderClient).updatePendingOrder(123L);
-        verify(orderClient, times(1)).updateExecutingStatus(123L);
-        verify(paymentRepository, never()).save(any(Payment.class));
+        // Then
+        assertThat(response.paymentId()).isEqualTo("56");
+        assertThat(response.status()).isEqualTo(PaymentStatus.NOT_STARTED);
+        verify(orderClient, never()).updatePendingOrder(123L);
+        verify(paymentRepository).save(any(Payment.class));
     }
 
     @Test
-    @DisplayName("활성 결제가 2개 이상이면 DB 이상 상황으로 예외를 던져야 한다")
-    void should_throw_exception_when_multiple_active_payments_exist() {
+    @DisplayName("활성 결제가 2개 이상이어도 모두 실패 처리하고 새 결제를 생성해야 한다")
+    void should_fail_all_active_payments_and_create_new_payment_when_multiple_active_payments_exist() {
         // Given
         when(orderClient.updateExecutingStatus(123L)).thenThrow(
             new PaymentOrderAlreadyExecutingException(123L, new RuntimeException("already executing"))
         );
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
         Payment first = Payment.builder()
             .id(1L)
             .orderId(123L)
@@ -288,11 +297,18 @@ class PaymentServiceTest {
         when(paymentRepository.findAllByOrderIdAndStatusIn(
             123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
             .thenReturn(List.of(first, second));
+        when(snowflakeIdGenerator.nextId()).thenReturn(56L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // When, Then
-        assertThatThrownBy(() -> paymentService.createPayment(new CreatePaymentRequest(123L)))
-            .isInstanceOf(PaymentException.class)
-            .hasMessage("[Payment] 처리 중인 결제가 2개 이상 존재합니다. orderId=123");
+        // When
+        PaymentResponse response = paymentService.createPayment(new CreatePaymentRequest(123L));
+
+        // Then
+        assertThat(first.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(second.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(response.paymentId()).isEqualTo("56");
+        assertThat(response.status()).isEqualTo(PaymentStatus.NOT_STARTED);
+        verify(paymentRepository).saveAll(List.of(first, second));
     }
 
     @Test
@@ -301,6 +317,9 @@ class PaymentServiceTest {
         // Given
         // 주문 조회는 성공하지만 저장소가 예외를 던지도록 준비한다.
         when(orderClient.updateExecutingStatus(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
+        when(paymentRepository.findAllByOrderIdAndStatusIn(
+            123L, List.of(PaymentStatus.NOT_STARTED, PaymentStatus.EXECUTING)))
+            .thenReturn(List.of());
         when(snowflakeIdGenerator.nextId()).thenReturn(1L);
         when(paymentRepository.save(any(Payment.class))).thenThrow(new RuntimeException("save failed"));
 

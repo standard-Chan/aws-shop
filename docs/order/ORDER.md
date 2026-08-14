@@ -65,7 +65,7 @@
 
 ### 결제 실패 후 대기
 - API: `POST /api/orders/{id}/pending`
-- 결제 검증 실패, 외부 결제 승인 실패, 활성 결제 복구 필요 상황에서 Payment가 호출한다.
+- 결제 검증 실패 또는 외부 결제 승인 실패 상황에서 Payment가 호출한다.
 - 주문 상태를 `PENDING`으로 변경한다.
 - 종료 상태 주문이면 `OrderInvalidStatusTransitionException`을 던진다.
 
@@ -85,11 +85,11 @@
 1. 사용자가 주문을 생성하면 주문은 `NOT_STARTED` 상태로 저장된다.
 2. 결제 생성 요청이 들어오면 Payment가 `POST /api/orders/{id}/executing`을 호출한다.
 3. Order가 `EXECUTING` 전환에 성공하면 Payment는 주문 총액을 기준으로 결제를 생성한다.
-4. Order가 이미 `EXECUTING`이면 Payment는 같은 주문의 활성 결제를 조회해 기존 결제 재사용, 만료 처리, 복구 필요 여부를 판단한다.
+4. Order가 이미 `EXECUTING`이면 Payment는 같은 주문의 기존 활성 결제를 `FAILED`로 바꾸고 새 결제를 생성한다.
 5. 결제 승인 성공 시 Payment는 `POST /api/orders/{id}/success`를 호출해 주문을 `COMPLETED`로 변경한다.
-6. 결제 승인 실패 또는 결제 복구 필요 시 Payment는 `POST /api/orders/{id}/pending`을 호출해 주문을 `PENDING`으로 변경한다.
+6. 결제 승인 실패 시 Payment는 `POST /api/orders/{id}/pending`을 호출해 주문을 `PENDING`으로 변경한다.
 
-현재 구조에서는 Order 상태 변경과 Payment 생성이 서로 다른 저장소와 트랜잭션 경계를 가진다. 따라서 `EXECUTING` 상태만으로 항상 활성 Payment row가 존재한다고 단정하지 않고, Payment 쪽에서 활성 결제 조회와 복구 분기를 함께 처리한다.
+현재 구조에서는 Order 상태 변경과 Payment 생성이 서로 다른 저장소와 트랜잭션 경계를 가진다. 결제 실패 및 성공 이력을 보존하기 위해 같은 주문에 여러 Payment row를 허용하고, 새 결제 생성 시점의 기존 활성 결제만 실패 처리한다.
 
 ## 예외 및 응답 계약
 - `OrderNotFoundException`: 주문 없음, HTTP `404 Not Found`

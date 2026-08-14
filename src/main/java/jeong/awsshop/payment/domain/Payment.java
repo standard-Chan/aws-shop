@@ -6,7 +6,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import jeong.awsshop.payment.exception.PaymentAmountMismatchException;
@@ -21,12 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(
-    name = "payment",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_payment_order_id", columnNames = "order_id")
-    }
-)
+@Table(name = "payment")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -113,9 +107,9 @@ public class Payment {
 
     /** 결제 실패 처리 */
     public void fail() {
-        // 결제 실패는 결제 진행 중인 상태에서만 가능하다.
+        // 결제 실패는 아직 성공/종료되지 않은 활성 결제에서만 가능하다.
         // 만약, SUCCESS 상태에서 취소가 된 경우, 잘못된 로직이므로 반드시 수정이 필요하다.
-        if (this.status != PaymentStatus.EXECUTING) {
+        if (!isActive()) {
             throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status, "결제 실패 처리 중 상태 예외가 발생하였습니다.");
         }
         this.status = PaymentStatus.FAILED;

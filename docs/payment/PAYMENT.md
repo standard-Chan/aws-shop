@@ -16,7 +16,8 @@
 
 ## 현재 구현 메모
 - `POST /api/payments`: `orders` row에 쓰기 락을 걸고 멱등키를 생성한 뒤 `Order.idempotencyKeys` 1:N 컬렉션에 추가하고 `Payment`를 저장한다.
-- 동일한 `orderId`로 결제 생성 요청이 다시 들어오면 `PaymentOrderAlreadyExecutingException`을 던지고 HTTP 409를 반환한다.
+- 동일한 `orderId`로 결제 생성 요청이 다시 들어오면 기존 활성 결제(`NOT_STARTED`, `EXECUTING`)를 `FAILED`로 변경한 뒤 새 `Payment`를 생성한다.
+- 같은 주문의 실패/성공 결제 이력을 보존하기 위해 `payment.order_id`는 unique가 아니다.
 - `POST /api/payments/confirm`: 요청의 `paymentKey`를 내부 `Payment`에 기록하고, `orderId`로 주문 라인을 조회해 모든 상품 재고를 예약한 뒤 `TossPaymentClient.confirm()` 결과를 그대로 반환한다.
 - 현재 요청 DTO에는 Bean Validation이 없어 `orderId` 누락, 금액 불일치 같은 입력 검증은 아직 명시적으로 보장되지 않는다.
 
@@ -39,6 +40,11 @@
 
 ## 결제 생성 멱등성 기준
 - `PaymentService.createPayment()`는 외부 order API가 아니라 로컬 `OrderRepository.findByIdForUpdate()`로 주문을 잠근다.
-- 잠긴 주문에 이미 `idempotencyKeys`가 있거나 상태가 `EXECUTING`이면 같은 `orderId`에 대한 중복 생성으로 보고 409를 반환한다.
+- 주문이 이미 `EXECUTING`이면 같은 `orderId`의 기존 활성 결제를 실패 처리하고 새 결제를 생성한다.
 - 첫 생성 요청은 `Order.idempotencyKeys`에 키를 추가한다. `idempotency_key.order_id`는 unique가 아니며 한 주문이 여러 멱등키 row를 가질 수 있는 1:N 매핑이다.
-- 기존의 진행 중 결제 재사용, 만료 결제 복구, 활성 결제 유실 복구 분기는 사용하지 않는다.
+- 기존의 진행 중 결제 재사용, 만료 결제 복구, 활성 결제 유실 복구 분기는 사용하지 않는다. 결제 이력 보존을 위해 새 결제 생성이 기본 정책이다.
+
+## 운영 DB 반영
+- 현재 프로젝트는 Flyway/Liquibase를 쓰지 않는다.
+- `prod`는 `ddl-auto: validate`이므로 운영 DB에는 배포 전에 `payment.order_id` unique index 제거 DDL을 먼저 적용해야 한다.
+- MySQL 기준 예시: `ALTER TABLE payment DROP INDEX uk_payment_order_id;`
