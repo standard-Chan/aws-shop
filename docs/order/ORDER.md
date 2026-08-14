@@ -3,6 +3,7 @@
 ## 현재 구현 범위
 - 현재 `order` 도메인은 주문 생성, 주문 요약 조회, 결제 연동을 위한 상태 갱신 API를 제공한다.
 - 주문 생성은 요청으로 받은 상품 ID와 수량을 기준으로 상품 가격을 조회하고 주문 금액을 계산한다.
+- 주문 총액은 `orders.total_amount`에 저장하고, 주문에 포함된 상품 정보는 `order_lines` 테이블에 별도 저장한다.
 - 주문 생성 시 재고 row 존재와 요청 수량 충족 여부를 확인하지만, 재고 차감이나 예약은 아직 수행하지 않는다.
 - 상품 가격이 `null`이면 주문 계산에서는 0원으로 처리한다.
 - 결제 생성과 승인은 `payment` 도메인이 주도하고, `order` 도메인은 결제 흐름에 필요한 주문 상태를 갱신하는 경계 역할을 한다.
@@ -19,6 +20,13 @@
 
 종료 상태인 `COMPLETED`, `CANCELED`, `EXPIRED` 주문은 다른 상태로 전이할 수 없다.
 
+## 저장 모델
+- `orders`: 주문 헤더 테이블이다. 주문 상태, 사용자 ID, 총 주문 금액, 배송지, 생성/만료/완료 시각을 저장한다.
+- `order_lines`: 주문 상품 라인 테이블이다. 주문에 포함된 각 상품의 `product_id`, `quantity`, `unit_price`, `line_amount`를 저장한다.
+- `orders.total_amount`는 해당 주문의 `order_lines.line_amount` 합계다.
+- `order_lines.order_id`는 `orders.id`를 참조한다. `Order` 엔티티에서 `OrderLine`을 cascade 저장하므로 주문 생성 시 주문 헤더와 라인이 함께 저장된다.
+- 현재 라인에는 상품 스냅샷 중 결제 금액 검증에 필요한 상품 ID, 수량, 주문 시점 단가, 라인 금액만 저장한다. 상품명, 이미지, 카테고리 같은 표시용 정보는 아직 저장하지 않는다.
+
 ## API 흐름
 
 ### 주문 생성
@@ -29,12 +37,14 @@
 - 상품 가격이 `null`이면 `unitPrice=0`, `lineAmount=0`으로 계산한다.
 - 임시 사용자 ID `1`과 임시 배송지 `Seoul Songpa-gu Olympic-ro 300`은 유지한다.
 - 상태는 `NOT_STARTED`로 저장한다.
+- `orders`에는 주문 총액을 저장하고, `order_lines`에는 상품별 구성 정보를 저장한다.
 - 응답은 `OrderSummaryResponse`이며 `orderId`, `userId`, `status`, `totalAmount`, `shippingAddress`, `items`를 포함한다.
 - `items`는 `productId`, `quantity`, `unitPrice`, `lineAmount`를 포함한다.
 
 ### 주문 조회
 - API: `GET /api/orders/{id}`
 - 저장된 주문을 조회해 `OrderSummaryResponse`로 반환한다.
+- 응답의 `items`는 `order_lines`에 저장된 주문 상품 라인 정보를 기준으로 구성한다.
 - 주문이 없으면 `OrderNotFoundException`을 던지고 HTTP `404 Not Found`로 응답한다.
 
 ### 결제 생성 진입 선점
