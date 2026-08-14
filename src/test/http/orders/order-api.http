@@ -1,31 +1,37 @@
+@host = http://localhost:8080
+@orderId = 2
+@productId1 = 1000000000001
+@productId2 = 1000000000002
+
 ### order 생성
-POST http://localhost:8080/api/orders
+# productId는 존재하는 상품이어야 하며, stock row와 충분한 quantity가 있어야 한다.
+POST {{host}}/api/orders
 Content-Type: application/json
 
 {
   "items": [
     {
-      "productId": 1000000000001,
+      "productId": {{productId1}},
       "quantity": 2
     },
     {
-      "productId": 1000000000002,
+      "productId": {{productId2}},
       "quantity": 1
     }
   ]
 }
 
 ### order id 로 조회
-GET http://localhost:8080/api/orders/2
+GET {{host}}/api/orders/{{orderId}}
 
 ### order executing 상태 갱신
-POST http://localhost:8080/api/orders/2/executing
+POST {{host}}/api/orders/{{orderId}}/executing
 
 ### order pending 상태 갱신
-POST http://localhost:8080/api/orders/2/pending
+POST {{host}}/api/orders/{{orderId}}/pending
 
 ### order 성공 상태 갱신
-POST http://localhost:8080/api/orders/2/success
+POST {{host}}/api/orders/{{orderId}}/success
 
 ### order 실패 상태 갱신
-POST http://localhost:8080/api/orders/2/fail
+POST {{host}}/api/orders/{{orderId}}/fail
