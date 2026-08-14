@@ -13,6 +13,7 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecuti
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
+import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
@@ -134,16 +135,16 @@ public class PaymentService {
 
         // 결제 승인 처리 시작. 상태 등록
         payment.start(confirmRequest.paymentKey());
-        boolean stockReserved = false;
+        List<OrderLineSummary> reservedLines = List.of();
 
         try {
             // 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
 
-            // 재고 예약 처리
-            stockService.decrease(confirmRequest.productId(), confirmRequest.quantity());
-            stockReserved = true;
+            // 주문 상품 전체 재고 예약 처리
+            OrderSummary order = orderClient.getOrder(payment.getOrderId());
+            reservedLines = reserveOrderStocks(order);
 
             // TODO : 주문 상태 검증
             // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
@@ -173,9 +174,7 @@ public class PaymentService {
             // Order 상태 pending 변경
             orderClient.updatePendingOrder(payment.getOrderId());
 
-            if (stockReserved) {
-                stockService.increase(confirmRequest.productId(), confirmRequest.quantity());
-            }
+            restoreReservedStocks(reservedLines);
 
             log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
@@ -184,6 +183,38 @@ public class PaymentService {
         } catch (Exception e) {
             log.error(e.getMessage());
             throw new PaymentException("[Payment] 알 수 없는 에러가 발생하였습니다.", e);
+        }
+    }
+
+    private List<OrderLineSummary> reserveOrderStocks(OrderSummary order) {
+        List<OrderLineSummary> orderLines = order.items();
+        if (orderLines.isEmpty()) {
+            throw new PaymentException("[Payment] 주문 상품 정보가 없습니다. orderId=" + order.orderId());
+        }
+
+        List<OrderLineSummary> reservedLines = new java.util.ArrayList<>();
+        try {
+            for (OrderLineSummary line : orderLines) {
+                stockService.decrease(line.productId(), line.quantity());
+                reservedLines.add(line);
+            }
+        } catch (PaymentException | StockException exception) {
+            restoreReservedStocks(reservedLines);
+            throw exception;
+        }
+
+        return reservedLines;
+    }
+
+    private void restoreReservedStocks(List<OrderLineSummary> reservedLines) {
+        for (int index = reservedLines.size() - 1; index >= 0; index--) {
+            OrderLineSummary line = reservedLines.get(index);
+            try {
+                stockService.increase(line.productId(), line.quantity());
+            } catch (RuntimeException restoreException) {
+                log.error("[Payment] 예약 재고 복구 실패. productId={}, quantity={}",
+                    line.productId(), line.quantity(), restoreException);
+            }
         }
     }
 }

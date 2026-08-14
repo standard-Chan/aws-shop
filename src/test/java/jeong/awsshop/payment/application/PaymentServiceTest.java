@@ -29,6 +29,7 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredExcepti
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
+import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
@@ -320,6 +321,7 @@ class PaymentServiceTest {
         ConfirmPaymentRequest request = confirmRequest();
         TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
 
         // When
@@ -329,11 +331,13 @@ class PaymentServiceTest {
         assertThat(response).isEqualTo(tossResponse);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         verify(stockService, never()).increase(10L, 2);
+        verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updateCompleteOrder(123L);
         verify(paymentRepository).save(payment);
 
         InOrder inOrder = inOrder(stockService, tossPaymentClient);
         inOrder.verify(stockService).decrease(10L, 2);
+        inOrder.verify(stockService).decrease(20L, 1);
         inOrder.verify(tossPaymentClient).confirm(any());
     }
 
@@ -344,6 +348,7 @@ class PaymentServiceTest {
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
         ConfirmPaymentRequest request = confirmRequest();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(stockService.decrease(10L, 2)).thenThrow(new InsufficientStockException(10L, 2, 0));
 
         // When, Then
@@ -354,6 +359,31 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(tossPaymentClient, never()).confirm(any());
         verify(stockService, never()).increase(10L, 2);
+        verify(stockService, never()).increase(20L, 1);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    @DisplayName("일부 주문 라인 재고 예약 후 다음 라인이 실패하면 이미 예약한 재고를 복구해야 한다")
+    void should_restore_already_reserved_stock_when_later_order_line_reservation_fails() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(stockService.decrease(10L, 2)).thenReturn(null);
+        when(stockService.decrease(20L, 1)).thenThrow(new InsufficientStockException(20L, 1, 0));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentConfirmExternalException.class)
+            .hasRootCauseInstanceOf(InsufficientStockException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(stockService).increase(10L, 2);
+        verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(payment);
     }
@@ -366,6 +396,7 @@ class PaymentServiceTest {
         ConfirmPaymentRequest request = confirmRequest();
         PaymentException tossException = new PaymentException("psp confirm failed");
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenThrow(tossException);
 
         // When, Then
@@ -376,6 +407,28 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(orderClient).updatePendingOrder(123L);
         verify(stockService).increase(10L, 2);
+        verify(stockService).increase(20L, 1);
+        verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    @DisplayName("주문 상품 라인이 비어 있으면 재고 차감 없이 결제를 실패 처리해야 한다")
+    void should_fail_payment_without_stock_decrease_when_order_items_are_empty() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentConfirmExternalException.class)
+            .hasRootCauseMessage("[Payment] 주문 상품 정보가 없습니다. orderId=123");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(payment);
     }
 
@@ -385,7 +438,22 @@ class PaymentServiceTest {
             1L,
             jeong.awsshop.order.domain.OrderStatus.EXECUTING,
             totalPrice,
-            "Seoul"
+            "Seoul",
+            List.of()
+        );
+    }
+
+    private OrderSummary createOrderSummaryWithItems() {
+        return new OrderSummary(
+            123L,
+            1L,
+            jeong.awsshop.order.domain.OrderStatus.EXECUTING,
+            new BigDecimal("100.00"),
+            "Seoul",
+            List.of(
+                new OrderLineSummary(10L, 2, new BigDecimal("30.00"), new BigDecimal("60.00")),
+                new OrderLineSummary(20L, 1, new BigDecimal("40.00"), new BigDecimal("40.00"))
+            )
         );
     }
 
@@ -405,9 +473,7 @@ class PaymentServiceTest {
             "payment-key-1",
             1L,
             123L,
-            new BigDecimal("140000.00"),
-            10L,
-            2
+            new BigDecimal("140000.00")
         );
     }
 

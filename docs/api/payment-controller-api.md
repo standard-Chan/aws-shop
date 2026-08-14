@@ -101,8 +101,6 @@ curl -X POST \
 | `paymentKey` | string | Y | Toss 결제 인증 완료 후 Frontend가 받은 외부 결제사 결제 키 |
 | `orderId` | long | Y | 주문 ID |
 | `amount` | number | Y | 승인 요청 금액 |
-| `productId` | long | Y | 재고를 예약할 상품 ID |
-| `quantity` | int | Y | 예약할 상품 수량 |
 
 ### 동작 메모
 
@@ -111,11 +109,12 @@ curl -X POST \
 - 승인 시작 시 내부 결제 상태를 진행 중으로 변경한 뒤, 주문 ID와 금액을 검증한다.
 - `paymentKey`는 이 서버가 생성하지 않는다. Toss 측에서 발급한 결제 고유 키를 Frontend가 받아 전달하는 값이며, 서버는 이 값을 내부 `Payment.paymentKey`에 저장한 뒤 Toss 승인 API에 그대로 전달한다.
 - Toss 승인 요청 DTO에서는 내부 `paymentId`를 Toss의 `orderId` 값으로 사용한다.
-- 검증 후 `StockService.decrease(productId, quantity)`로 재고를 예약한다.
+- 검증 후 `orderId`로 주문 요약을 조회하고, 주문의 모든 `items` 라인에 대해 `StockService.decrease(productId, quantity)`로 재고를 예약한다.
 - 재고 예약이 성공하면 Toss 결제 승인 API를 호출하고, 성공 시 결제 상태를 완료로 변경한다.
 - 승인 성공 후 주문 서비스에 완료 상태 업데이트를 요청한다.
 - 재고 예약 실패 시 Toss 결제 승인 API를 호출하지 않고 내부 결제 상태를 실패로 변경한다.
-- 재고 예약 이후 승인 실패가 발생하면 `StockService.increase(productId, quantity)`로 예약 수량을 복구한다.
+- 일부 주문 라인 재고 예약 후 다음 라인 예약이 실패하면 이미 예약한 라인을 `StockService.increase(productId, quantity)`로 복구한다.
+- 재고 예약 이후 승인 실패가 발생하면 예약한 모든 주문 라인을 `StockService.increase(productId, quantity)`로 복구한다.
 - 승인 실패 시 내부 결제 상태를 실패로 변경하고 주문 서비스에 pending 상태 업데이트를 요청한 뒤 예외를 다시 던진다.
 
 ### 요청 예시
@@ -125,9 +124,7 @@ curl -X POST \
   "paymentId": 1,
   "paymentKey": "payment-key-1",
   "orderId": 123,
-  "amount": 100.00,
-  "productId": 10,
-  "quantity": 2
+  "amount": 100.00
 }
 ```
 
@@ -167,9 +164,7 @@ curl -X POST \
     "paymentId": 1,
     "paymentKey": "payment-key-1",
     "orderId": 123,
-    "amount": 100.00,
-    "productId": 10,
-    "quantity": 2
+    "amount": 100.00
   }'
 ```
 
