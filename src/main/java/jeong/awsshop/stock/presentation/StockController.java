@@ -19,7 +19,7 @@ public class StockController {
 
     @PostMapping("{productId}/decrease")
     public StockResponse decrease(
-        @PathVariable Long productId,
+        @PathVariable("productId") Long productId,
         @RequestBody StockQuantityRequest request
     ) {
         return stockService.decrease(productId, request.quantity());
@@ -27,7 +27,7 @@ public class StockController {
 
     @PostMapping("{productId}/increase")
     public StockResponse increase(
-        @PathVariable Long productId,
+        @PathVariable("productId") Long productId,
         @RequestBody StockQuantityRequest request
     ) {
         return stockService.increase(productId, request.quantity());
