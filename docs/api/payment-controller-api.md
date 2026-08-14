@@ -10,7 +10,7 @@
 
 ### 요청 바디 검증
 
-- `CreatePaymentRequest`, `TossPaymentConfirmRequest`에는 현재 Bean Validation이 없다.
+- `CreatePaymentRequest`, `ConfirmPaymentRequest`에는 현재 Bean Validation이 없다.
 - 따라서 `null`, 음수, 형식 오류를 컨트롤러 계층에서 명시적으로 검증하지 않는다.
 - JSON 역직렬화가 불가능한 경우를 제외하면, 대부분의 입력 오류는 service 또는 하위 도메인 로직에서 실패한다.
 
@@ -98,7 +98,7 @@ curl -X POST \
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `paymentId` | long | Y | 내부 결제 ID |
-| `paymentKey` | string | Y | 외부 결제사 결제 키 |
+| `paymentKey` | string | Y | Toss 결제 인증 완료 후 Frontend가 받은 외부 결제사 결제 키 |
 | `orderId` | long | Y | 주문 ID |
 | `amount` | number | Y | 승인 요청 금액 |
 | `productId` | long | Y | 재고를 예약할 상품 ID |
@@ -109,6 +109,8 @@ curl -X POST \
 - controller는 요청 본문을 `ConfirmPaymentRequest`로 받아 `PaymentService.confirmPayment()`에 전달한다.
 - service는 먼저 `paymentId`로 내부 결제 정보를 조회한다.
 - 승인 시작 시 내부 결제 상태를 진행 중으로 변경한 뒤, 주문 ID와 금액을 검증한다.
+- `paymentKey`는 이 서버가 생성하지 않는다. Toss 측에서 발급한 결제 고유 키를 Frontend가 받아 전달하는 값이며, 서버는 이 값을 내부 `Payment.paymentKey`에 저장한 뒤 Toss 승인 API에 그대로 전달한다.
+- Toss 승인 요청 DTO에서는 내부 `paymentId`를 Toss의 `orderId` 값으로 사용한다.
 - 검증 후 `StockService.decrease(productId, quantity)`로 재고를 예약한다.
 - 재고 예약이 성공하면 Toss 결제 승인 API를 호출하고, 성공 시 결제 상태를 완료로 변경한다.
 - 승인 성공 후 주문 서비스에 완료 상태 업데이트를 요청한다.
