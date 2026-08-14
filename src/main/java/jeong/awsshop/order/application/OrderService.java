@@ -1,14 +1,29 @@
 package jeong.awsshop.order.application;
 
 import jeong.awsshop.order.domain.Order;
+import jeong.awsshop.order.domain.OrderLine;
 import jeong.awsshop.order.domain.OrderRepository;
 import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.order.exception.OrderAlreadyCanceledException;
 import jeong.awsshop.order.exception.OrderAlreadyCompletedException;
 import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
 import jeong.awsshop.order.exception.OrderExpiredException;
+import jeong.awsshop.order.exception.OrderInsufficientStockException;
 import jeong.awsshop.order.exception.OrderNotFoundException;
+import jeong.awsshop.order.exception.OrderProductNotFoundException;
+import jeong.awsshop.order.exception.OrderStockNotFoundException;
+import jeong.awsshop.order.presentation.dto.CreateOrderItemRequest;
+import jeong.awsshop.order.presentation.dto.CreateOrderRequest;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
+import jeong.awsshop.product.domain.Product;
+import jeong.awsshop.product.repository.ProductRepository;
+import jeong.awsshop.stock.domain.Stock;
+import jeong.awsshop.stock.domain.StockRepository;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,33 +33,62 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
+    private final StockRepository stockRepository;
 
-    /**
-     * 현재는 임시 주문을 생성한다.
-     * <p>
-     * TODO 추후 오케스트레이션
-     * 1. user 정보 검증 및 조회
-     * 2. user의 장바구니 조회
-     * 3. 장바구니 기준 product 정보 수집
-     * 4. 가격/재고/배송 정보 검증
-     * 5. 주문 생성 및 저장
-     */
     @Transactional
-    public OrderSummaryResponse createOrder() {
-
-        // TODO : USER 정보 조회
+    public OrderSummaryResponse createOrder(CreateOrderRequest request) {
         Long TEMP_USER_ID = 1L;
+        Map<Long, Integer> requestedItems = aggregateItems(request.items());
+        Map<Long, Product> products = findProducts(requestedItems);
+        validateStocks(requestedItems);
+        List<OrderLine> lines = requestedItems.entrySet().stream()
+            .map(entry -> OrderLine.create(
+                entry.getKey(),
+                entry.getValue(),
+                products.get(entry.getKey()).getPrice()
+            ))
+            .toList();
 
-        // TODO : USER의 장바구니 조회
-
-        // TODO : 장바구니 기준 product 정보 수집
-
-        // TODO : 가격/재고/배송 정보 검증
-
-        // TODO : 주문 생성 및 저장
-        Order savedOrder = orderRepository.save(Order.createTemporary(TEMP_USER_ID));
+        Order savedOrder = orderRepository.save(Order.create(TEMP_USER_ID, lines));
 
         return OrderSummaryResponse.from(savedOrder);
+    }
+
+    private Map<Long, Integer> aggregateItems(List<CreateOrderItemRequest> items) {
+        Map<Long, Integer> requestedItems = new LinkedHashMap<>();
+        for (CreateOrderItemRequest item : items) {
+            requestedItems.merge(item.productId(), item.quantity(), Integer::sum);
+        }
+        return requestedItems;
+    }
+
+    private Map<Long, Product> findProducts(Map<Long, Integer> requestedItems) {
+        Map<Long, Product> products = productRepository.findAllById(requestedItems.keySet()).stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+        requestedItems.keySet().stream()
+            .filter(productId -> !products.containsKey(productId))
+            .findFirst()
+            .ifPresent(productId -> {
+                throw new OrderProductNotFoundException(productId);
+            });
+        return products;
+    }
+
+    private void validateStocks(Map<Long, Integer> requestedItems) {
+        Map<Long, Stock> stocks = stockRepository.findAllByProductIdIn(requestedItems.keySet()).stream()
+            .collect(Collectors.toMap(Stock::getProductId, Function.identity()));
+        for (Map.Entry<Long, Integer> entry : requestedItems.entrySet()) {
+            Long productId = entry.getKey();
+            int requestedQuantity = entry.getValue();
+            Stock stock = stocks.get(productId);
+            if (stock == null) {
+                throw new OrderStockNotFoundException(productId);
+            }
+            if (stock.isInsufficientFor(requestedQuantity)) {
+                throw new OrderInsufficientStockException(productId, requestedQuantity, stock.getQuantity());
+            }
+        }
     }
 
     /**

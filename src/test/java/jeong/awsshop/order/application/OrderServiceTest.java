@@ -3,11 +3,13 @@ package jeong.awsshop.order.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import jeong.awsshop.order.domain.Order;
 import jeong.awsshop.order.domain.OrderRepository;
@@ -16,9 +18,18 @@ import jeong.awsshop.order.exception.OrderAlreadyCanceledException;
 import jeong.awsshop.order.exception.OrderAlreadyCompletedException;
 import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
 import jeong.awsshop.order.exception.OrderExpiredException;
+import jeong.awsshop.order.exception.OrderInsufficientStockException;
 import jeong.awsshop.order.exception.OrderInvalidStatusTransitionException;
 import jeong.awsshop.order.exception.OrderNotFoundException;
+import jeong.awsshop.order.exception.OrderProductNotFoundException;
+import jeong.awsshop.order.exception.OrderStockNotFoundException;
+import jeong.awsshop.order.presentation.dto.CreateOrderItemRequest;
+import jeong.awsshop.order.presentation.dto.CreateOrderRequest;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
+import jeong.awsshop.product.domain.Product;
+import jeong.awsshop.product.repository.ProductRepository;
+import jeong.awsshop.stock.domain.Stock;
+import jeong.awsshop.stock.domain.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,16 +44,34 @@ class OrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private StockRepository stockRepository;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository);
+        orderService = new OrderService(orderRepository, productRepository, stockRepository);
     }
 
     @Test
-    @DisplayName("주문 생성 요청이 오면 임시 주문 정보를 저장하고 반환해야 한다")
-    void should_create_temporary_order_when_create_order_is_called() {
+    @DisplayName("주문 생성 요청이 오면 상품 가격과 수량으로 총액을 계산하고 주문 라인을 저장해야 한다")
+    void should_create_order_with_items_and_calculated_amount() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(100L, 2),
+            new CreateOrderItemRequest(200L, 3)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of(
+            product(100L, "12.50"),
+            product(200L, "3.00")
+        ));
+        when(stockRepository.findAllByProductIdIn(any())).thenReturn(List.of(
+            stock(100L, 10),
+            stock(200L, 5)
+        ));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             return Order.builder()
@@ -54,10 +83,11 @@ class OrderServiceTest {
                 .createdAt(order.getCreatedAt())
                 .expiresAt(order.getExpiresAt())
                 .completedAt(order.getCompletedAt())
+                .lines(order.getLines())
                 .build();
         });
 
-        OrderSummaryResponse response = orderService.createOrder();
+        OrderSummaryResponse response = orderService.createOrder(request);
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(orderCaptor.capture());
@@ -65,17 +95,109 @@ class OrderServiceTest {
 
         assertThat(savedOrder.getUserId()).isEqualTo(1L);
         assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.NOT_STARTED);
-        assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo("129.99");
+        assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo("34.00");
         assertThat(savedOrder.getShippingAddress()).isEqualTo("Seoul Songpa-gu Olympic-ro 300");
         assertThat(savedOrder.getCreatedAt()).isNotNull();
         assertThat(savedOrder.getExpiresAt()).isAfter(savedOrder.getCreatedAt());
         assertThat(savedOrder.getCompletedAt()).isNull();
+        assertThat(savedOrder.getLines()).hasSize(2);
+        assertThat(savedOrder.getLines().get(0).getProductId()).isEqualTo(100L);
+        assertThat(savedOrder.getLines().get(0).getQuantity()).isEqualTo(2);
+        assertThat(savedOrder.getLines().get(0).getUnitPrice()).isEqualByComparingTo("12.50");
+        assertThat(savedOrder.getLines().get(0).getLineAmount()).isEqualByComparingTo("25.00");
 
         assertThat(response.orderId()).isEqualTo(10L);
         assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.status()).isEqualTo(OrderStatus.NOT_STARTED);
-        assertThat(response.totalAmount()).isEqualByComparingTo("129.99");
+        assertThat(response.totalAmount()).isEqualByComparingTo("34.00");
         assertThat(response.shippingAddress()).isEqualTo("Seoul Songpa-gu Olympic-ro 300");
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items().get(1).productId()).isEqualTo(200L);
+        assertThat(response.items().get(1).quantity()).isEqualTo(3);
+        assertThat(response.items().get(1).lineAmount()).isEqualByComparingTo("9.00");
+    }
+
+    @Test
+    @DisplayName("가격이 없는 상품은 0원으로 계산해야 한다")
+    void should_calculate_null_price_as_zero_when_create_order() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(100L, 2)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product(100L, null)));
+        when(stockRepository.findAllByProductIdIn(any())).thenReturn(List.of(stock(100L, 10)));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderSummaryResponse response = orderService.createOrder(request);
+
+        assertThat(response.totalAmount()).isEqualByComparingTo("0");
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).unitPrice()).isEqualByComparingTo("0");
+        assertThat(response.items().get(0).lineAmount()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("같은 상품이 여러 번 요청되면 수량을 합산해 하나의 주문 라인으로 저장해야 한다")
+    void should_merge_duplicate_product_items_when_create_order() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(100L, 2),
+            new CreateOrderItemRequest(100L, 3)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product(100L, "4.00")));
+        when(stockRepository.findAllByProductIdIn(any())).thenReturn(List.of(stock(100L, 5)));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderSummaryResponse response = orderService.createOrder(request);
+
+        assertThat(response.totalAmount()).isEqualByComparingTo("20.00");
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).productId()).isEqualTo(100L);
+        assertThat(response.items().get(0).quantity()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 상품으로 주문을 생성하면 예외를 던져야 한다")
+    void should_throw_exception_when_order_product_does_not_exist() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(999L, 1)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+            .isInstanceOf(OrderProductNotFoundException.class)
+            .hasMessage("[Order] 주문 상품이 존재하지 않습니다. productId=999");
+        verify(stockRepository, never()).findAllByProductIdIn(any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("재고 row가 없는 상품으로 주문을 생성하면 예외를 던져야 한다")
+    void should_throw_exception_when_order_stock_does_not_exist() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(100L, 1)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product(100L, "4.00")));
+        when(stockRepository.findAllByProductIdIn(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+            .isInstanceOf(OrderStockNotFoundException.class)
+            .hasMessage("[Order] 주문 상품 재고가 존재하지 않습니다. productId=100");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("재고 수량이 부족하면 주문 생성 예외를 던지고 재고를 차감하지 않아야 한다")
+    void should_throw_exception_when_order_stock_is_insufficient() {
+        CreateOrderRequest request = new CreateOrderRequest(List.of(
+            new CreateOrderItemRequest(100L, 3)
+        ));
+        when(productRepository.findAllById(any())).thenReturn(List.of(product(100L, "4.00")));
+        when(stockRepository.findAllByProductIdIn(any())).thenReturn(List.of(stock(100L, 2)));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+            .isInstanceOf(OrderInsufficientStockException.class)
+            .hasMessage("[Order] 주문 상품 재고가 부족합니다. productId=100, requestedQuantity=3, currentQuantity=2");
+        verify(stockRepository, never()).decreaseIfEnough(any(), any(Integer.class));
+        verify(orderRepository, never()).save(any());
     }
 
     @Test
@@ -318,5 +440,22 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.cancelOrder(23L))
             .isInstanceOf(OrderInvalidStatusTransitionException.class)
             .hasMessageContaining("id=23");
+    }
+
+    private Product product(Long id, String price) {
+        return Product.builder()
+            .id(id)
+            .parentAsin("ASIN-" + id)
+            .title("Product " + id)
+            .mainCategory("Handmade")
+            .price(price == null ? null : new BigDecimal(price))
+            .build();
+    }
+
+    private Stock stock(Long productId, int quantity) {
+        return Stock.builder()
+            .productId(productId)
+            .quantity(quantity)
+            .build();
     }
 }

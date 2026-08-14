@@ -2,8 +2,9 @@
 
 ## 현재 구현 범위
 - 현재 `order` 도메인은 주문 생성, 주문 요약 조회, 결제 연동을 위한 상태 갱신 API를 제공한다.
-- 주문 생성은 아직 장바구니, 상품, 재고, 배송지 검증을 거치지 않는 임시 구현이다.
-- `Order.createTemporary()`는 고정 사용자, 고정 금액, 고정 배송지를 가진 `NOT_STARTED` 주문을 생성한다.
+- 주문 생성은 요청으로 받은 상품 ID와 수량을 기준으로 상품 가격을 조회하고 주문 금액을 계산한다.
+- 주문 생성 시 재고 row 존재와 요청 수량 충족 여부를 확인하지만, 재고 차감이나 예약은 아직 수행하지 않는다.
+- 상품 가격이 `null`이면 주문 계산에서는 0원으로 처리한다.
 - 결제 생성과 승인은 `payment` 도메인이 주도하고, `order` 도메인은 결제 흐름에 필요한 주문 상태를 갱신하는 경계 역할을 한다.
 
 ## 주문 상태 모델
@@ -22,12 +23,14 @@
 
 ### 주문 생성
 - API: `POST /api/orders`
-- 현재 동작:
-  - 임시 사용자 ID `1`을 사용한다.
-  - 임시 총액 `129.99`를 사용한다.
-  - 임시 배송지 `Seoul Songpa-gu Olympic-ro 300`을 사용한다.
-  - 상태는 `NOT_STARTED`로 저장한다.
-- 응답은 `OrderSummaryResponse`이며 `orderId`, `userId`, `status`, `totalAmount`, `shippingAddress`를 포함한다.
+- 요청은 `items` 배열로 상품 ID와 수량을 받는다.
+- 같은 상품 ID가 여러 번 들어오면 수량을 합산해 하나의 주문 라인으로 저장한다.
+- 상품별 `lineAmount = unitPrice * quantity`로 계산하고 주문 `totalAmount`는 주문 라인 금액 합계다.
+- 상품 가격이 `null`이면 `unitPrice=0`, `lineAmount=0`으로 계산한다.
+- 임시 사용자 ID `1`과 임시 배송지 `Seoul Songpa-gu Olympic-ro 300`은 유지한다.
+- 상태는 `NOT_STARTED`로 저장한다.
+- 응답은 `OrderSummaryResponse`이며 `orderId`, `userId`, `status`, `totalAmount`, `shippingAddress`, `items`를 포함한다.
+- `items`는 `productId`, `quantity`, `unitPrice`, `lineAmount`를 포함한다.
 
 ### 주문 조회
 - API: `GET /api/orders/{id}`
@@ -80,6 +83,9 @@
 
 ## 예외 및 응답 계약
 - `OrderNotFoundException`: 주문 없음, HTTP `404 Not Found`
+- `OrderProductNotFoundException`: 주문 생성 대상 상품 없음, HTTP `404 Not Found`
+- `OrderStockNotFoundException`: 주문 생성 대상 상품 재고 row 없음, HTTP `404 Not Found`
+- `OrderInsufficientStockException`: 주문 생성 대상 상품 재고 부족, HTTP `409 Conflict`
 - `OrderAlreadyExecutingException`: 이미 처리 중인 주문, HTTP `409 Conflict`, `X-Order-Status: EXECUTING`
 - `OrderAlreadyCompletedException`: 이미 완료된 주문, HTTP `409 Conflict`, `X-Order-Status: COMPLETED`
 - `OrderAlreadyCanceledException`: 이미 취소된 주문, HTTP `409 Conflict`, `X-Order-Status: CANCELED`
@@ -87,19 +93,16 @@
 - `OrderInvalidStatusTransitionException`: 종료 상태에서의 잘못된 상태 전이, HTTP `409 Conflict`
 
 ## 확장 설계
-현재 주문 생성은 임시 구현이므로 실제 주문 생성 흐름은 다음 책임을 순서대로 추가한다.
+현재 주문 생성은 요청 상품 기준 주문 라인 생성과 금액 계산까지 구현한다. 이후 실제 주문 생성 흐름은 다음 책임을 순서대로 추가한다.
 
 1. 사용자 정보 검증 및 조회
 2. 사용자 장바구니 조회
-3. 장바구니 기준 상품 정보 수집
-4. 상품 가격, 판매 가능 상태, 재고 검증
-5. 배송지 검증 및 배송 정책 계산
-6. 주문 라인 생성
-7. 주문 총액 계산
-8. 주문 저장
-9. 결제 완료 후 구매 이벤트 발행
+3. 상품 판매 가능 상태 검증
+4. 배송지 검증 및 배송 정책 계산
+5. 주문 생성 시점 재고 예약 또는 결제 성공 시점 재고 차감 정책 확정
+6. 결제 완료 후 구매 이벤트 발행
 
-상품별 구매율, 추천 학습, 구매 이벤트 정합성을 위해서는 주문에 주문 상품 라인 모델이 필요하다. 현재 analytics와 recommendation 문서에서도 `PURCHASE` 이벤트는 `orderId`만 가지고 있고 `productId`가 없어 상품별 구매 지표에 직접 반영하지 않는다. 주문 라인 모델이 추가되면 구매 이벤트는 주문 라인을 기준으로 상품 ID를 함께 발행하는 방향으로 확장한다.
+상품별 구매율, 추천 학습, 구매 이벤트 정합성을 위해 주문 상품 라인 모델을 저장한다. 현재 analytics와 recommendation 문서에서 `PURCHASE` 이벤트는 아직 `orderId`만 가지고 있으므로, 구매 이벤트는 주문 라인을 기준으로 상품 ID를 함께 발행하는 방향으로 확장한다.
 
 ## 테스트 기준
 - service 테스트는 주문 생성, 조회, 상태 전이, 종료 상태 전이 거부를 검증한다.

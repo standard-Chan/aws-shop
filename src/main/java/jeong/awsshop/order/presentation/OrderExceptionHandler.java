@@ -4,8 +4,11 @@ import jeong.awsshop.order.exception.OrderAlreadyCanceledException;
 import jeong.awsshop.order.exception.OrderAlreadyCompletedException;
 import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
 import jeong.awsshop.order.exception.OrderExpiredException;
+import jeong.awsshop.order.exception.OrderInsufficientStockException;
 import jeong.awsshop.order.exception.OrderInvalidStatusTransitionException;
 import jeong.awsshop.order.exception.OrderNotFoundException;
+import jeong.awsshop.order.exception.OrderProductNotFoundException;
+import jeong.awsshop.order.exception.OrderStockNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,6 +23,21 @@ public class OrderExceptionHandler {
     @ExceptionHandler(OrderNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public String handleOrderNotFound(OrderNotFoundException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler({
+        OrderProductNotFoundException.class,
+        OrderStockNotFoundException.class
+    })
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String handleOrderCreateNotFound(RuntimeException exception) {
+        return exception.getMessage();
+    }
+
+    @ExceptionHandler(OrderInsufficientStockException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String handleOrderCreateConflict(OrderInsufficientStockException exception) {
         return exception.getMessage();
     }
 

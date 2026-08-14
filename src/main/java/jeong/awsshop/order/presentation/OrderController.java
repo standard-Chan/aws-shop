@@ -1,11 +1,14 @@
 package jeong.awsshop.order.presentation;
 
+import jakarta.validation.Valid;
 import jeong.awsshop.order.application.OrderService;
+import jeong.awsshop.order.presentation.dto.CreateOrderRequest;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,8 +20,8 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public OrderSummaryResponse createOrder() {
-        return orderService.createOrder();
+    public OrderSummaryResponse createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        return orderService.createOrder(request);
     }
 
     @GetMapping("{id}")

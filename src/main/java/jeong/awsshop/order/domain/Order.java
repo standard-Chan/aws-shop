@@ -7,9 +7,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.CascadeType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import jeong.awsshop.order.exception.OrderInvalidStatusTransitionException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -48,6 +52,10 @@ public class Order {
 
     private LocalDateTime completedAt;
 
+    @Builder.Default
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderLine> lines = new ArrayList<>();
+
     public static Order createTemporary(Long userId) {
         long resolvedUserId = userId == null ? 1L : userId;
         LocalDateTime createdAt = LocalDateTime.now();
@@ -60,6 +68,30 @@ public class Order {
             .createdAt(createdAt)
             .expiresAt(createdAt.plusMinutes(30))
             .build();
+    }
+
+    public static Order create(Long userId, List<OrderLine> lines) {
+        long resolvedUserId = userId == null ? 1L : userId;
+        LocalDateTime createdAt = LocalDateTime.now();
+        BigDecimal totalAmount = lines.stream()
+            .map(OrderLine::getLineAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Order order = Order.builder()
+            .userId(resolvedUserId)
+            .status(OrderStatus.NOT_STARTED)
+            .totalAmount(totalAmount)
+            .shippingAddress("Seoul Songpa-gu Olympic-ro 300")
+            .createdAt(createdAt)
+            .expiresAt(createdAt.plusMinutes(30))
+            .build();
+        lines.forEach(order::addLine);
+        return order;
+    }
+
+    private void addLine(OrderLine line) {
+        line.assignOrder(this);
+        this.lines.add(line);
     }
 
     public void pending() {

@@ -2,6 +2,19 @@
 POST http://localhost:8080/api/orders
 Content-Type: application/json
 
+{
+  "items": [
+    {
+      "productId": 1000000000001,
+      "quantity": 2
+    },
+    {
+      "productId": 1000000000002,
+      "quantity": 1
+    }
+  ]
+}
+
 ### order id 로 조회
 GET http://localhost:8080/api/orders/2
 

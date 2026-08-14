@@ -88,6 +88,10 @@ public class Product implements Persistable<Long> {
         return id;
     }
 
+    public BigDecimal getPrice() {
+        return price;
+    }
+
     /* GeneratedValue 대신 Snowflake ID를 사용하므로, INSERT 가 가능하도록 true 반환 */
     @Override
     public boolean isNew() {

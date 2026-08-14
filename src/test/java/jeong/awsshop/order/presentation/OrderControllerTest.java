@@ -1,5 +1,6 @@
 package jeong.awsshop.order.presentation;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -14,10 +15,15 @@ import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.order.exception.OrderAlreadyCanceledException;
 import jeong.awsshop.order.exception.OrderAlreadyExecutingException;
 import jeong.awsshop.order.exception.OrderExpiredException;
+import jeong.awsshop.order.exception.OrderInsufficientStockException;
 import jeong.awsshop.order.exception.OrderNotFoundException;
+import jeong.awsshop.order.exception.OrderProductNotFoundException;
+import jeong.awsshop.order.presentation.dto.CreateOrderRequest;
+import jeong.awsshop.order.presentation.dto.OrderLineResponse;
 import jeong.awsshop.order.presentation.dto.OrderSummaryResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -34,27 +40,119 @@ class OrderControllerTest {
     private OrderService orderService;
 
     @Test
-    @DisplayName("주문 생성 요청이 오면 service 결과를 JSON으로 반환해야 한다")
+    @DisplayName("주문 생성 요청이 오면 request를 service에 전달하고 주문 라인을 포함한 JSON을 반환해야 한다")
     void should_return_created_order_when_create_order_request_is_valid() throws Exception {
         OrderSummaryResponse response = new OrderSummaryResponse(
             1L,
             1L,
             OrderStatus.NOT_STARTED,
-            new BigDecimal("129.99"),
-            "Seoul Songpa-gu Olympic-ro 300"
+            new BigDecimal("34.00"),
+            "Seoul Songpa-gu Olympic-ro 300",
+            java.util.List.of(
+                new OrderLineResponse(100L, 2, new BigDecimal("12.50"), new BigDecimal("25.00")),
+                new OrderLineResponse(200L, 3, new BigDecimal("3.00"), new BigDecimal("9.00"))
+            )
         );
-        when(orderService.createOrder()).thenReturn(response);
+        when(orderService.createOrder(any(CreateOrderRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/orders")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "items": [
+                        {"productId": 100, "quantity": 2},
+                        {"productId": 200, "quantity": 3}
+                      ]
+                    }
+                    """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.orderId").value(1L))
             .andExpect(jsonPath("$.userId").value(1L))
             .andExpect(jsonPath("$.status").value("NOT_STARTED"))
-            .andExpect(jsonPath("$.totalAmount").value(129.99))
-            .andExpect(jsonPath("$.shippingAddress").value("Seoul Songpa-gu Olympic-ro 300"));
+            .andExpect(jsonPath("$.totalAmount").value(34.00))
+            .andExpect(jsonPath("$.shippingAddress").value("Seoul Songpa-gu Olympic-ro 300"))
+            .andExpect(jsonPath("$.items[0].productId").value(100L))
+            .andExpect(jsonPath("$.items[0].quantity").value(2))
+            .andExpect(jsonPath("$.items[0].unitPrice").value(12.50))
+            .andExpect(jsonPath("$.items[0].lineAmount").value(25.00))
+            .andExpect(jsonPath("$.items[1].productId").value(200L))
+            .andExpect(jsonPath("$.items[1].quantity").value(3))
+            .andExpect(jsonPath("$.items[1].lineAmount").value(9.00));
 
-        verify(orderService).createOrder();
+        ArgumentCaptor<CreateOrderRequest> requestCaptor = ArgumentCaptor.forClass(CreateOrderRequest.class);
+        verify(orderService).createOrder(requestCaptor.capture());
+        CreateOrderRequest capturedRequest = requestCaptor.getValue();
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.items()).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.items().get(0).productId()).isEqualTo(100L);
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.items().get(0).quantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("주문 생성 요청의 items가 비어 있으면 400을 반환해야 한다")
+    void should_return_bad_request_when_create_order_items_is_empty() throws Exception {
+        mockMvc.perform(post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "items": []
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("주문 생성 요청의 quantity가 양수가 아니면 400을 반환해야 한다")
+    void should_return_bad_request_when_create_order_quantity_is_not_positive() throws Exception {
+        mockMvc.perform(post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "items": [
+                        {"productId": 100, "quantity": 0}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 상품 주문 생성 요청은 404를 반환해야 한다")
+    void should_return_not_found_when_order_product_does_not_exist_for_create_request() throws Exception {
+        when(orderService.createOrder(any(CreateOrderRequest.class)))
+            .thenThrow(new OrderProductNotFoundException(999L));
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "items": [
+                        {"productId": 999, "quantity": 1}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isNotFound())
+            .andExpect(content().string("[Order] 주문 상품이 존재하지 않습니다. productId=999"));
+    }
+
+    @Test
+    @DisplayName("재고가 부족한 상품 주문 생성 요청은 409를 반환해야 한다")
+    void should_return_conflict_when_order_stock_is_insufficient_for_create_request() throws Exception {
+        when(orderService.createOrder(any(CreateOrderRequest.class)))
+            .thenThrow(new OrderInsufficientStockException(100L, 3, 2));
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "items": [
+                        {"productId": 100, "quantity": 3}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(content().string(
+                "[Order] 주문 상품 재고가 부족합니다. productId=100, requestedQuantity=3, currentQuantity=2"
+            ));
     }
 
     @Test
