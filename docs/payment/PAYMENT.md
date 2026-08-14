@@ -23,12 +23,13 @@
 
 ## `POST /api/payments/confirm`의 `paymentKey`
 - `paymentKey`는 이 서버가 생성하는 내부 결제 ID나 주문 ID가 아니다.
-- `Payment` 엔티티 주석 기준으로, Toss 측에서 발급한 결제 고유 키를 Frontend가 받아 `/api/payments/confirm` 요청에 포함해 전달하는 값이다.
+- `paymentKey`는 결제 승인 시도를 분류하는 키이며, 중복 사용을 허용하지 않는다.
+- 같은 `paymentKey`가 다시 들어온 요청은 같은 승인 시도의 중복 요청으로 보아야 하므로, `paymentKey`는 결제 승인 멱등키 역할을 한다.
 - 서버는 `ConfirmPaymentRequest.paymentKey`를 받아 `Payment.start(paymentKey)`에서 공백/null 검증 후 `Payment.paymentKey`에 저장한다.
 - 서버는 요청의 `productId`, `quantity`를 받지 않고, `orderId`로 조회한 주문 라인의 모든 `productId`, `quantity`를 구매 처리 대상으로 사용한다.
 - 이후 `PaymentService.confirmPayment()`는 `new TossPaymentConfirmRequest(confirmRequest.paymentId(), confirmRequest.paymentKey(), confirmRequest.amount())`를 만들어 Toss Payments 승인 API(`/v1/payments/confirm`)로 보낸다.
 - 이때 `TossPaymentConfirmRequest.orderId`에는 내부 `paymentId`가 들어간다. 코드 주석상 현재 시스템에서는 내부 `paymentId`를 Toss의 `orderId`로 사용한다.
-- 따라서 `/api/payments/confirm` 호출자는 결제창 또는 Toss 결제 인증 완료 이후 받은 `paymentKey`를 그대로 전달해야 한다. 테스트용 임의 문자열은 mock 테스트나 로컬 예시에서는 가능하지만, 실제 Toss 승인 요청에서는 Toss가 발급한 유효한 `paymentKey`여야 한다.
+- 실제 외부 결제 연동에서는 `/api/payments/confirm` 호출자가 결제창 또는 외부 결제 인증 완료 이후 받은 유효한 `paymentKey`를 그대로 전달해야 한다. 테스트용 임의 문자열은 mock 테스트나 로컬 예시에서만 사용한다.
 
 ## 이번 변경 전에 읽을 순서
 - [PaymentService.java](/mnt/c/Users/정석찬/Desktop/project/aws-shop/src/main/java/jeong/awsshop/payment/application/PaymentService.java)

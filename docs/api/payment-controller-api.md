@@ -100,7 +100,7 @@ curl -X POST \
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `paymentId` | long | Y | 내부 결제 ID |
-| `paymentKey` | string | Y | Toss 결제 인증 완료 후 Frontend가 받은 외부 결제사 결제 키 |
+| `paymentKey` | string | Y | 결제 승인 시도를 식별하는 중복 불가 키. 결제 승인 멱등키로 사용한다. |
 | `orderId` | long | Y | 주문 ID |
 | `amount` | number | Y | 승인 요청 금액 |
 
@@ -109,7 +109,9 @@ curl -X POST \
 - controller는 요청 본문을 `ConfirmPaymentRequest`로 받아 `PaymentService.confirmPayment()`에 전달한다.
 - service는 먼저 `paymentId`로 내부 결제 정보를 조회한다.
 - 승인 시작 시 내부 결제 상태를 진행 중으로 변경한 뒤, 주문 ID와 금액을 검증한다.
-- `paymentKey`는 이 서버가 생성하지 않는다. Toss 측에서 발급한 결제 고유 키를 Frontend가 받아 전달하는 값이며, 서버는 이 값을 내부 `Payment.paymentKey`에 저장한 뒤 Toss 승인 API에 그대로 전달한다.
+- `paymentKey`는 결제 승인 시도를 분류하는 키이며, 같은 `paymentKey`의 중복 사용은 허용하지 않는다.
+- 서버는 `paymentKey`를 내부 `Payment.paymentKey`에 저장하고, 결제 승인 재시도/중복 요청을 구분하기 위한 멱등키로 사용한다.
+- 현재 구현에서는 `paymentKey`가 외부 결제사 승인 요청에도 전달된다. 외부 결제 연동 환경에서는 호출자가 결제창 또는 외부 결제 인증 완료 후 받은 유효한 키를 그대로 전달해야 한다.
 - Toss 승인 요청 DTO에서는 내부 `paymentId`를 Toss의 `orderId` 값으로 사용한다.
 - 검증 후 `orderId`로 주문 요약을 조회하고, 주문의 모든 `items` 라인에 대해 `StockService.decrease(productId, quantity)`로 재고를 예약한다.
 - 재고 예약이 성공하면 Toss 결제 승인 API를 호출하고, 성공 시 결제 상태를 완료로 변경한다.
@@ -148,7 +150,7 @@ curl -X POST \
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
-| `paymentKey` | string | 외부 결제 키 |
+| `paymentKey` | string | 결제 승인 시도 식별 키 |
 | `orderId` | string | 외부 결제사 응답의 주문 ID |
 | `method` | string | 결제 수단 |
 | `status` | string | 외부 결제 상태. 예: `DONE`, `CANCELED`, `ABORTED` |
