@@ -3,6 +3,7 @@ package jeong.awsshop.payment.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
 import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
@@ -344,6 +346,7 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+        when(paymentRepository.save(payment)).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
@@ -354,11 +357,44 @@ class PaymentServiceTest {
         verify(stockService, never()).increase(10L, 2);
         verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updateCompleteOrder(123L);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository, times(2)).save(payment);
 
-        InOrder inOrder = inOrder(stockService, tossPaymentClient);
+        InOrder inOrder = inOrder(stockService, paymentRepository, tossPaymentClient);
         inOrder.verify(stockService).decrease(10L, 2);
         inOrder.verify(stockService).decrease(20L, 1);
+        inOrder.verify(paymentRepository).save(payment);
+        inOrder.verify(tossPaymentClient).confirm(any());
+    }
+
+    @Test
+    @DisplayName("재고 예약 후 Toss 승인 요청 전에 EXECUTING 상태를 저장해야 한다")
+    void should_save_executing_payment_before_toss_confirm_after_stock_reservation() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
+        AtomicInteger saveCount = new AtomicInteger();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+        doAnswer(invocation -> {
+            int currentSaveCount = saveCount.incrementAndGet();
+            if (currentSaveCount == 1) {
+                assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+                assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            }
+            return invocation.getArgument(0);
+        }).when(paymentRepository).save(payment);
+
+        // When
+        paymentService.confirmPayment(request);
+
+        // Then
+        assertThat(saveCount).hasValue(2);
+        InOrder inOrder = inOrder(stockService, paymentRepository, tossPaymentClient);
+        inOrder.verify(stockService).decrease(10L, 2);
+        inOrder.verify(stockService).decrease(20L, 1);
+        inOrder.verify(paymentRepository).save(payment);
         inOrder.verify(tossPaymentClient).confirm(any());
     }
 
@@ -513,9 +549,21 @@ class PaymentServiceTest {
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
         ConfirmPaymentRequest request = confirmRequest();
         PaymentException tossException = new PaymentException("psp confirm failed");
+        AtomicInteger saveCount = new AtomicInteger();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenThrow(tossException);
+        doAnswer(invocation -> {
+            int currentSaveCount = saveCount.incrementAndGet();
+            if (currentSaveCount == 1) {
+                assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+                assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            }
+            if (currentSaveCount == 2) {
+                assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+            }
+            return invocation.getArgument(0);
+        }).when(paymentRepository).save(payment);
 
         // When, Then
         assertThatThrownBy(() -> paymentService.confirmPayment(request))
@@ -523,10 +571,11 @@ class PaymentServiceTest {
             .hasRootCauseMessage("psp confirm failed");
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(saveCount).hasValue(2);
         verify(orderClient).updatePendingOrder(123L);
         verify(stockService).increase(10L, 2);
         verify(stockService).increase(20L, 1);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository, times(2)).save(payment);
     }
 
     @Test

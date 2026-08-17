@@ -147,6 +147,8 @@ public class PaymentService {
             // 주문 상품 전체 재고 예약 처리
             reservedLines = reserveOrderStocks(order);
 
+            paymentRepository.save(payment);
+
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
                     confirmRequest.paymentKey(), confirmRequest.amount()));
