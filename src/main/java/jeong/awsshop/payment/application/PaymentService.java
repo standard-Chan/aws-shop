@@ -3,6 +3,7 @@ package jeong.awsshop.payment.application;
 import java.time.LocalDateTime;
 import java.util.List;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
+import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
@@ -10,7 +11,10 @@ import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
+import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
 import jeong.awsshop.payment.infrastructure.TossPaymentClient;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
@@ -121,6 +125,9 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
+        OrderSummary order = getConfirmableOrder(payment.getOrderId());
+
+        // payment 만료 여부 검증
         if (payment.isExpired(LocalDateTime.now())) {
             payment.expire();
             paymentRepository.save(payment);
@@ -133,17 +140,12 @@ public class PaymentService {
         List<OrderLineSummary> reservedLines = List.of();
 
         try {
-            // 검증
+            // 결제 로직 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.confirm(confirmRequest.amount());
 
             // 주문 상품 전체 재고 예약 처리
-            OrderSummary order = orderClient.getOrder(payment.getOrderId());
             reservedLines = reserveOrderStocks(order);
-
-            // TODO : 주문 상태 검증
-            // 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오면, 주문이 이미 완료된 상태이므로, 결제 승인 요청을 실패 처리한다.
-            // (실제 서비스에서는 주문 상태가 COMPLETED인 경우, 결제 승인 요청이 들어오지 않도록 프론트엔드에서 막는 것이 좋다.)
 
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
@@ -178,6 +180,38 @@ public class PaymentService {
             log.error(e.getMessage());
             throw new PaymentException("[Payment] 알 수 없는 에러가 발생하였습니다.", e);
         }
+    }
+
+    private OrderSummary getConfirmableOrder(Long orderId) {
+        OrderSummary order;
+        try {
+            order = orderClient.getOrder(orderId);
+        } catch (PaymentException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new PaymentOrderLookupException(orderId, exception);
+        }
+
+        validateConfirmableOrderStatus(order);
+        return order;
+    }
+
+    private void validateConfirmableOrderStatus(OrderSummary order) {
+        OrderStatus status = order.status();
+        if (status == OrderStatus.EXECUTING) {
+            return;
+        }
+        if (status == OrderStatus.COMPLETED) {
+            throw new PaymentOrderAlreadyCompletedException(order.orderId(), null);
+        }
+        if (status == OrderStatus.CANCELED) {
+            throw new PaymentOrderAlreadyCanceledException(order.orderId(), null);
+        }
+        if (status == OrderStatus.EXPIRED) {
+            throw new PaymentOrderExpiredException(order.orderId(), null);
+        }
+        throw new PaymentOrderLookupException(order.orderId(),
+            "결제 승인 가능한 주문 상태가 아닙니다. status=" + status);
     }
 
     private List<OrderLineSummary> reserveOrderStocks(OrderSummary order) {

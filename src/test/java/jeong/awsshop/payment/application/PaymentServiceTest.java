@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import jeong.awsshop.common.snowflake.SnowflakeIdGenerator;
+import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
@@ -368,6 +369,7 @@ class PaymentServiceTest {
         Payment payment = expiredPayment(1L, 123L, new BigDecimal("100.00"));
         ConfirmPaymentRequest request = confirmRequest();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
 
         // When, Then
         assertThatThrownBy(() -> paymentService.confirmPayment(request))
@@ -377,12 +379,84 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository).save(payment);
+        verify(orderClient).getOrder(123L);
         verify(orderClient).updatePendingOrder(123L);
-        verify(orderClient, never()).getOrder(123L);
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(stockService, never()).decrease(any(), any(Integer.class));
         verify(stockService, never()).increase(any(), any(Integer.class));
         verify(tossPaymentClient, never()).confirm(any());
+    }
+
+    @Test
+    @DisplayName("이미 완료된 주문이면 결제 승인 흐름을 시작하지 않아야 한다")
+    void should_reject_confirm_payment_without_starting_payment_when_order_is_completed() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L))
+            .thenReturn(createOrderSummary(123L, new BigDecimal("100.00"), OrderStatus.COMPLETED));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentOrderAlreadyCompletedException.class)
+            .hasMessage("[Payment-Order] 이미 완료된 주문입니다. orderId=123");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(payment.getPaymentKey()).isNull();
+        verify(paymentRepository, never()).save(payment);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(orderClient, never()).updatePendingOrder(123L);
+    }
+
+    @Test
+    @DisplayName("이미 취소된 주문이면 결제 승인 흐름을 시작하지 않아야 한다")
+    void should_reject_confirm_payment_without_starting_payment_when_order_is_canceled() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L))
+            .thenReturn(createOrderSummary(123L, new BigDecimal("100.00"), OrderStatus.CANCELED));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentOrderAlreadyCanceledException.class)
+            .hasMessage("[Payment-Order] 이미 실패한 주문입니다. orderId=123");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(payment.getPaymentKey()).isNull();
+        verify(paymentRepository, never()).save(payment);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(orderClient, never()).updatePendingOrder(123L);
+    }
+
+    @Test
+    @DisplayName("만료된 주문이면 결제 승인 흐름을 시작하지 않아야 한다")
+    void should_reject_confirm_payment_without_starting_payment_when_order_is_expired() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L))
+            .thenReturn(createOrderSummary(123L, new BigDecimal("100.00"), OrderStatus.EXPIRED));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentOrderExpiredException.class)
+            .hasMessage("[Payment-Order] 만료된 주문입니다. orderId=123");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(payment.getPaymentKey()).isNull();
+        verify(paymentRepository, never()).save(payment);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(orderClient, never()).updatePendingOrder(123L);
     }
 
     @Test
@@ -477,10 +551,14 @@ class PaymentServiceTest {
     }
 
     private OrderSummary createOrderSummary(Long orderId, BigDecimal totalPrice) {
+        return createOrderSummary(orderId, totalPrice, OrderStatus.EXECUTING);
+    }
+
+    private OrderSummary createOrderSummary(Long orderId, BigDecimal totalPrice, OrderStatus status) {
         return new OrderSummary(
             orderId,
             1L,
-            jeong.awsshop.order.domain.OrderStatus.EXECUTING,
+            status,
             totalPrice,
             "Seoul",
             List.of()
@@ -491,7 +569,7 @@ class PaymentServiceTest {
         return new OrderSummary(
             123L,
             1L,
-            jeong.awsshop.order.domain.OrderStatus.EXECUTING,
+            OrderStatus.EXECUTING,
             new BigDecimal("100.00"),
             "Seoul",
             List.of(
