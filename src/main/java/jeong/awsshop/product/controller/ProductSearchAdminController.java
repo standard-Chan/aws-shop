@@ -21,6 +21,8 @@ public class ProductSearchAdminController {
 
     /**
      * MySQL 상품 데이터를 source of truth로 보고 ES 검색 read model을 page 단위로 다시 색인한다.
+     * admin만 사용 가능한 API
+     * TODO : API KEY를 받아서 관리자만 접근 가능하도록 인증/인가 처리 필요
      */
     @PostMapping("/reindex")
     public ProductSearchReindexResponse reindexProducts(
