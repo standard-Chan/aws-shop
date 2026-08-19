@@ -5,11 +5,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import jeong.awsshop.payment.exception.PaymentInvalidPaymentKey;
 import jeong.awsshop.payment.exception.PaymentInvalidStatusException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class PaymentTest {
+
+    @Test
+    @DisplayName("결제 시작 시 paymentKey가 유효하지 않으면 상태를 변경하지 않아야 한다")
+    void should_not_change_status_when_payment_key_is_invalid_on_start() {
+        Payment payment = payment(PaymentStatus.NOT_STARTED);
+
+        assertThatThrownBy(() -> payment.start(" "))
+            .isInstanceOf(PaymentInvalidPaymentKey.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(payment.getPaymentKey()).isNull();
+    }
 
     @Test
     @DisplayName("결제 시작 전 상태도 실패 처리할 수 있어야 한다")

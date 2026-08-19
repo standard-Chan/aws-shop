@@ -141,16 +141,21 @@ Toss 승인 요청 전에 내부 DB에 `Payment.status=EXECUTING`과 `paymentKey
 1. Payment 조회
 2. 주문 조회 및 주문 상태 검증
 3. 결제 만료 검증
-4. payment.start(paymentKey)
+4. Payment 종료 상태 검증
 5. orderId, amount 검증
-6. 주문 라인 재고 예약
-7. Payment를 EXECUTING 상태로 저장
-8. Toss Payments 승인 요청
-9. 성공 시 Payment SUCCESS 저장 및 Order 완료 처리
-10. 실패 시 FAILED 저장, 주문 PENDING 복구, 예약 재고 복구
+6. payment.start(paymentKey)
+7. 주문 라인 재고 예약
+8. Payment를 EXECUTING 상태로 저장
+9. Toss Payments 승인 요청
+10. 성공 시 Payment SUCCESS 저장 및 Order 완료 처리
+11. 실패 시 FAILED 저장, 주문 PENDING 복구, 예약 재고 복구
 ```
 
-이렇게 하면 서버가 Toss 승인 요청 직전이나 승인 직후 종료되어도, DB에 해당 결제가 결제 승인 구간에 들어갔다는 사실이 남는다.
+종료 상태 검증은 기존 `payment.start(paymentKey)`가 있던 위치에서 먼저 수행한다. 이미 `SUCCESS`, `FAILED`, `EXPIRED`처럼 종료된 결제는 새로운 승인 시도 대상으로 보지 않기 때문에, 실패 보상 로직으로 `FAILED` 처리하지 않고 즉시 거부한다.
+
+`orderId`, `amount` 검증은 결제 승인 요청 값 자체의 검증이다. 이 검증을 통과한 뒤 `payment.start(paymentKey)`를 호출해 `paymentKey`를 등록하고 상태를 `EXECUTING`으로 바꾼다. 따라서 `paymentKey`가 없거나 현재 상태가 `NOT_STARTED`가 아니어서 `start()`가 실패하면, 해당 요청은 승인 처리 시작 이후의 실패로 보고 `FAILED`로 닫는다.
+
+재고 예약은 `start()` 이후에 실행한다. 그래야 재고 예약 실패나 Toss 승인 실패가 모두 이미 시작된 결제 승인 시도의 실패로 기록된다. 다만 Toss 승인 요청 전에는 반드시 `Payment.status=EXECUTING`과 `paymentKey`를 DB에 저장한다. 이렇게 하면 서버가 Toss 승인 요청 직전이나 승인 직후 종료되어도, DB에 해당 결제가 결제 승인 구간에 들어갔다는 사실이 남는다.
 
 ### 5.2 서버 재시작 복구
 
@@ -177,6 +182,8 @@ Toss 승인 요청 전에 내부 DB에 `Payment.status=EXECUTING`과 `paymentKey
 
 ## 8. 테스트 기준
 
+- 종료 상태인 Payment는 승인 실패 처리 없이 즉시 거부되어야 한다.
+- `orderId`, `amount` 검증 이후, 재고 예약 전에 `payment.start(paymentKey)`가 실행되어야 한다.
 - 재고 예약 후 Toss 승인 요청 전에 `paymentRepository.save(payment)`가 먼저 호출되어야 한다.
 - 첫 저장 시점의 `Payment.status`는 `EXECUTING`, `paymentKey`는 요청 값이어야 한다.
 - Toss 승인 실패 시에는 중간 `EXECUTING` 저장 이후 최종 `FAILED` 저장이 발생해야 한다.

@@ -24,6 +24,7 @@ import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
+import jeong.awsshop.payment.exception.PaymentInvalidStatusException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
@@ -347,6 +348,11 @@ class PaymentServiceTest {
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
         when(paymentRepository.save(payment)).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+            assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            return null;
+        }).when(stockService).decrease(10L, 2);
 
         // When
         TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
@@ -367,7 +373,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("재고 예약 후 Toss 승인 요청 전에 EXECUTING 상태를 저장해야 한다")
+    @DisplayName("결제 시작 후 재고를 예약하고 Toss 승인 요청 전에 EXECUTING 상태를 저장해야 한다")
     void should_save_executing_payment_before_toss_confirm_after_stock_reservation() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
@@ -377,6 +383,11 @@ class PaymentServiceTest {
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+        doAnswer(invocation -> {
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+            assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            return null;
+        }).when(stockService).decrease(10L, 2);
         doAnswer(invocation -> {
             int currentSaveCount = saveCount.incrementAndGet();
             if (currentSaveCount == 1) {
@@ -420,6 +431,27 @@ class PaymentServiceTest {
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(stockService, never()).decrease(any(), any(Integer.class));
         verify(stockService, never()).increase(any(), any(Integer.class));
+        verify(tossPaymentClient, never()).confirm(any());
+    }
+
+    @Test
+    @DisplayName("이미 종료된 결제이면 승인 실패 처리 없이 승인 흐름을 시작하지 않아야 한다")
+    void should_reject_finished_payment_without_marking_failed_when_payment_is_already_finished() {
+        // Given
+        Payment payment = paymentWithStatus(1L, 123L, new BigDecimal("100.00"), PaymentStatus.SUCCESS);
+        ConfirmPaymentRequest request = confirmRequest();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentInvalidStatusException.class)
+            .hasMessage("[Payment] 결제 승인 요청을 시작할 수 없는 상태입니다. expected=NOT_STARTED, actual=SUCCESS");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(paymentRepository, never()).save(payment);
+        verify(orderClient, never()).updatePendingOrder(123L);
+        verify(stockService, never()).decrease(any(), any(Integer.class));
         verify(tossPaymentClient, never()).confirm(any());
     }
 
@@ -629,10 +661,14 @@ class PaymentServiceTest {
     }
 
     private Payment notStartedPayment(Long paymentId, Long orderId, BigDecimal amount) {
+        return paymentWithStatus(paymentId, orderId, amount, PaymentStatus.NOT_STARTED);
+    }
+
+    private Payment paymentWithStatus(Long paymentId, Long orderId, BigDecimal amount, PaymentStatus status) {
         return Payment.builder()
             .id(paymentId)
             .orderId(orderId)
-            .status(PaymentStatus.NOT_STARTED)
+            .status(status)
             .amount(amount)
             .createdAt(LocalDateTime.now().minusMinutes(1))
             .expiresAt(LocalDateTime.now().plusMinutes(4))
