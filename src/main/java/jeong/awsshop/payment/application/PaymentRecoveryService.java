@@ -27,6 +27,11 @@ public class PaymentRecoveryService {
     private final OrderClient orderClient;
     private final StockService stockService;
 
+    /** 
+     * 서버 비정상 종료로 인한 결제 상태 불일치 처리
+     * 서버 실행 시작 시각 기준으로, 이전에 결제 상태 = EXECUTING 인 결제를 조회하여, toss 결제 상태와 일치시킨다.
+     * 서버 실행 시각을 기준으로 하는 이유: 신규 결제 진행 중인 EXECUTING 결제는 제외하기 위함
+    */
     public void recoverExecutingPaymentsBefore(LocalDateTime applicationStartupTime) {
         List<Payment> recoverablePayments = paymentRepository.findAllByStatusAndCreatedAtBefore(
             PaymentStatus.EXECUTING,
@@ -38,6 +43,7 @@ public class PaymentRecoveryService {
         }
     }
 
+    /** Toss Payments 결제 정보를 조회하여, 로컬 DB 결제 상태를 toss 결제 상태와 통일시킨다. */
     private void recoverPayment(Payment payment) {
         try {
             if (payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
@@ -59,6 +65,7 @@ public class PaymentRecoveryService {
         }
     }
 
+    /** 정상 결제 처리 */
     private void recoverSuccessfulPayment(Payment payment) {
         payment.complete();
         orderClient.updateCompleteOrder(payment.getOrderId());
@@ -67,6 +74,7 @@ public class PaymentRecoveryService {
             payment.getId(), payment.getOrderId());
     }
 
+    /** 결제 실패 처리 */
     private void recoverFailedPayment(Payment payment) {
         payment.fail();
         paymentRepository.save(payment);
@@ -79,6 +87,7 @@ public class PaymentRecoveryService {
             payment.getId(), payment.getOrderId());
     }
 
+    /** 재고 복구 처리 */
     private void restoreReservedStocks(List<OrderLineSummary> reservedLines) {
         for (int index = reservedLines.size() - 1; index >= 0; index--) {
             OrderLineSummary line = reservedLines.get(index);
