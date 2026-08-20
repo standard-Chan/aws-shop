@@ -9,6 +9,6 @@ public class PaymentInvalidStatusException extends PaymentException {
     }
 
     public PaymentInvalidStatusException(PaymentStatus expected, PaymentStatus actual, String message) {
-        super("[Payment]" + message + " expected=" + expected + ", actual=" + actual);
+        super("[Payment] " + message + " expected=" + expected + ", actual=" + actual);
     }
 }

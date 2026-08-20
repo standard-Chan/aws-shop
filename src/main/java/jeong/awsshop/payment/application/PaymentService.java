@@ -135,17 +135,22 @@ public class PaymentService {
             throw new PaymentExpiredException(payment.getOrderId(), payment.getId());
         }
 
-        // 결제 승인 처리 시작. 상태 등록
-        payment.start(confirmRequest.paymentKey());
+        // 종료 상태 결제는 승인 시도 실패로 닫지 않고, 승인 흐름 진입 전에 거부한다.
+        payment.validateConfirmableStatus();
         List<OrderLineSummary> reservedLines = List.of();
 
         try {
             // 결제 로직 검증
             payment.validateOrderId(confirmRequest.orderId());
-            payment.confirm(confirmRequest.amount());
+            payment.validateConfirmAmount(confirmRequest.amount());
+
+            // 결제 승인 처리 시작 및 상태 등록
+            payment.start(confirmRequest.paymentKey());
 
             // 주문 상품 전체 재고 예약 처리
             reservedLines = reserveOrderStocks(order);
+
+            paymentRepository.save(payment);
 
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),

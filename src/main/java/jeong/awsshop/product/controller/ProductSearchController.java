@@ -20,8 +20,7 @@ public class ProductSearchController {
     private final ProductSearchService productSearchService;
 
     /**
-     * Elasticsearch read model을 사용해 title 기반 상품 검색을 수행한다.
-     * 기존 /keyword와 달리 score, highlight, ES search_after cursor를 별도 계약으로 제공한다.
+     * Elasticsearch 를 사용해 keyword 기반 상품 검색을 수행한다.
      */
     @GetMapping("/search")
     public ProductSearchResponse searchProducts(

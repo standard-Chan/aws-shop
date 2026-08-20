@@ -58,9 +58,8 @@ public class Payment {
         if (this.status != PaymentStatus.NOT_STARTED) {
             throw new PaymentInvalidStatusException(PaymentStatus.NOT_STARTED, this.status);
         }
-        this.status = PaymentStatus.EXECUTING;
-
         registerPaymentKey(paymentKey);
+        this.status = PaymentStatus.EXECUTING;
     }
 
     private void registerPaymentKey(String paymentKey) {
@@ -77,10 +76,10 @@ public class Payment {
         }
     }
 
-    /** 결제 승인 요청 검증
+    /** 결제 승인 금액 검증
      * Toss payment가 원화를 지원하기 때문에, FE에서 전달하는 amount 값과 toss에 confirm 해야하는 amount 값이 원화로 변환되어야함.
      * */
-    public void confirm(BigDecimal requestedAmount) {
+    public void validateConfirmAmount(BigDecimal requestedAmount) {
         long DOLLAR = 1400L;
 
         if (requestedAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -90,9 +89,13 @@ public class Payment {
         if (this.amount.multiply(new BigDecimal(DOLLAR)).compareTo(requestedAmount) != 0) {
             throw new PaymentAmountMismatchException(this.amount, requestedAmount);
         }
+    }
 
-        if (this.status != PaymentStatus.EXECUTING) {
-            throw new PaymentInvalidStatusException(PaymentStatus.EXECUTING, this.status);
+    /** 결제 승인 시도 가능 상태 검증 */
+    public void validateConfirmableStatus() {
+        if (!isActive()) {
+            throw new PaymentInvalidStatusException(PaymentStatus.NOT_STARTED, this.status,
+                "결제 승인 요청을 시작할 수 없는 상태입니다.");
         }
     }
 

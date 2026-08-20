@@ -31,17 +31,11 @@ public class TossPaymentClient {
     public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
 
         try {
-            String encodedSecretKey = Base64.getEncoder()
-                .encodeToString(
-                    (secretKey + ":")
-                        .getBytes(StandardCharsets.UTF_8)
-                );
-
             return tossPaymentClient.post()
                 .uri("https://api.tosspayments.com/v1/payments/confirm")
                 .header(
                     HttpHeaders.AUTHORIZATION,
-                    "Basic " + encodedSecretKey
+                    authorizationHeader()
                 )
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
@@ -50,6 +44,30 @@ public class TossPaymentClient {
         } catch (Exception e) {
             throw new PaymentTossPaymentProcessingException(request.orderId(), request.paymentKey(), e.getMessage(), e);
         }
+    }
+
+    public TossPaymentConfirmResponse getPayment(String paymentKey) {
+        try {
+            return tossPaymentClient.get()
+                .uri("https://api.tosspayments.com/v1/payments/{paymentKey}", paymentKey)
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    authorizationHeader()
+                )
+                .retrieve()
+                .body(TossPaymentConfirmResponse.class);
+        } catch (Exception e) {
+            throw new PaymentTossPaymentProcessingException(null, paymentKey, e.getMessage(), e);
+        }
+    }
+
+    private String authorizationHeader() {
+        String encodedSecretKey = Base64.getEncoder()
+            .encodeToString(
+                (secretKey + ":")
+                    .getBytes(StandardCharsets.UTF_8)
+            );
+        return "Basic " + encodedSecretKey;
     }
 
 }
