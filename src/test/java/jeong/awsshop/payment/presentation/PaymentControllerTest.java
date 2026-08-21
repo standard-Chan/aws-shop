@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 import jeong.awsshop.payment.application.PaymentService;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.PaymentAlreadyExecutingException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
@@ -270,5 +271,27 @@ class PaymentControllerTest {
                     """))
             .andExpect(status().isGone())
             .andExpect(content().string("[Payment] 결제가 만료되었습니다. orderId=123, paymentId=1"));
+    }
+
+    @Test
+    @DisplayName("이미 승인 처리 중인 결제이면 HTTP 409를 반환해야 한다")
+    void should_return_conflict_when_confirm_payment_is_already_executing() throws Exception {
+        // Given
+        when(paymentService.confirmPayment(any(ConfirmPaymentRequest.class)))
+            .thenThrow(new PaymentAlreadyExecutingException(1L));
+
+        // When, Then
+        mockMvc.perform(post("/api/payments/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "paymentId": 1,
+                      "paymentKey": "payment-key-1",
+                      "orderId": 123,
+                      "amount": 100
+                    }
+                    """))
+            .andExpect(status().isConflict())
+            .andExpect(content().string("[Payment] 이미 승인 처리 중인 결제입니다. paymentId=1"));
     }
 }
