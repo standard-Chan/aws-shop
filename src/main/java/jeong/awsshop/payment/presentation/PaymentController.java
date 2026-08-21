@@ -2,6 +2,7 @@ package jeong.awsshop.payment.presentation;
 
 import jeong.awsshop.payment.application.PaymentService;
 import jeong.awsshop.payment.exception.DuplicatePaymentException;
+import jeong.awsshop.payment.exception.PaymentAlreadyExecutingException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
@@ -43,6 +44,12 @@ public class PaymentController {
     @ResponseStatus(HttpStatus.CONFLICT)
     @ExceptionHandler(DuplicatePaymentException.class)
     public String handleDuplicatePayment(DuplicatePaymentException ex) {
+        return ex.getMessage();
+    }
+
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ExceptionHandler(PaymentAlreadyExecutingException.class)
+    public String handleAlreadyExecutingPayment(PaymentAlreadyExecutingException ex) {
         return ex.getMessage();
     }
 
