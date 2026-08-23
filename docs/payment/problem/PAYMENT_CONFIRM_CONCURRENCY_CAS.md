@@ -38,7 +38,7 @@ WHERE id = :paymentId
 5. paymentKey null/blank 검증
 6. DB CAS: NOT_STARTED -> EXECUTING, paymentKey 저장
 7. CAS 실패 시 409 반환
-8. CAS 성공 시 로컬 Payment 객체도 EXECUTING으로 동기화
+8. CAS 성공 시 DB에서 Payment를 재조회해 EXECUTING 상태와 paymentKey를 확인한 객체를 후속 처리 기준으로 사용
 9. try 블록 진입
 10. orderId, amount 검증
 11. 주문 라인 재고 예약
@@ -47,7 +47,9 @@ WHERE id = :paymentId
 14. 실패 시 Payment FAILED, Order PENDING, 예약 재고 복구
 ```
 
-`payment.start()`를 `try` 밖으로 옮긴 이유는 승인 처리 중 실패가 아니라 승인 시작 전 실행권 선점 단계이기 때문이다. CAS 실패 요청은 실제 승인 흐름에 들어가지 못했으므로 결제를 `FAILED`로 닫거나 주문을 `PENDING`으로 되돌리거나 재고를 복구하지 않는다.
+CAS 선점은 승인 처리 중 실패가 아니라 승인 시작 전 실행권 선점 단계이다. CAS 실패 요청은 실제 승인 흐름에 들어가지 못했으므로 결제를 `FAILED`로 닫거나 주문을 `PENDING`으로 되돌리거나 재고를 복구하지 않는다.
+
+CAS 성공 후에는 `payment.start()`로 기존 메모리 객체를 수동 동기화하지 않고 DB에서 Payment를 다시 조회한다. 결제 승인 실행권과 상태 변경은 DB 조건부 update가 확정한 결과이므로, DB를 source of truth로 두고 이후 `complete()`, `fail()` 같은 도메인 상태 전이는 재조회한 엔티티를 기준으로 수행한다. 이렇게 하면 메모리 객체가 DB 상태를 흉내 내는 방식보다 정합성 기준이 명확해진다.
 
 ## 제외 범위
 

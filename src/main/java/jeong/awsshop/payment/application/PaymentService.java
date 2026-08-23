@@ -147,7 +147,8 @@ public class PaymentService {
         if (updatedCount == 0) {
             throw new PaymentAlreadyExecutingException(confirmRequest.paymentId());
         }
-        payment.start(confirmRequest.paymentKey());
+        payment = paymentRepository.findById(confirmRequest.paymentId())
+            .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
         List<OrderLineSummary> reservedLines = List.of();
 

@@ -344,16 +344,17 @@ class PaymentServiceTest {
     void should_reserve_stock_before_toss_confirm_and_complete_payment() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
         TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
-        when(paymentRepository.save(payment)).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRepository.save(startedPayment)).thenAnswer(invocation -> invocation.getArgument(0));
         doAnswer(invocation -> {
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
-            assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+            assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             return null;
         }).when(stockService).decrease(10L, 2);
 
@@ -362,18 +363,19 @@ class PaymentServiceTest {
 
         // Then
         assertThat(response).isEqualTo(tossResponse);
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         verify(stockService, never()).increase(10L, 2);
         verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updateCompleteOrder(123L);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository).save(startedPayment);
 
         InOrder inOrder = inOrder(stockService, paymentRepository, tossPaymentClient);
         inOrder.verify(paymentRepository).startConfirmIfNotStarted(1L, "payment-key-1");
         inOrder.verify(stockService).decrease(10L, 2);
         inOrder.verify(stockService).decrease(20L, 1);
         inOrder.verify(tossPaymentClient).confirm(any());
-        inOrder.verify(paymentRepository).save(payment);
+        inOrder.verify(paymentRepository).save(startedPayment);
     }
 
     @Test
@@ -381,26 +383,27 @@ class PaymentServiceTest {
     void should_start_confirm_by_cas_before_stock_reservation_and_toss_confirm() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
         TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
         AtomicInteger saveCount = new AtomicInteger();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
         when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
         doAnswer(invocation -> {
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
-            assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+            assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+            assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             return null;
         }).when(stockService).decrease(10L, 2);
         doAnswer(invocation -> {
             int currentSaveCount = saveCount.incrementAndGet();
             if (currentSaveCount == 1) {
-                assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-                assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+                assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+                assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             }
             return invocation.getArgument(0);
-        }).when(paymentRepository).save(payment);
+        }).when(paymentRepository).save(startedPayment);
 
         // When
         paymentService.confirmPayment(request);
@@ -412,7 +415,7 @@ class PaymentServiceTest {
         inOrder.verify(stockService).decrease(10L, 2);
         inOrder.verify(stockService).decrease(20L, 1);
         inOrder.verify(tossPaymentClient).confirm(any());
-        inOrder.verify(paymentRepository).save(payment);
+        inOrder.verify(paymentRepository).save(startedPayment);
     }
 
     @Test
@@ -587,8 +590,9 @@ class PaymentServiceTest {
     void should_fail_payment_without_toss_confirm_when_stock_reservation_fails() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
         when(stockService.decrease(10L, 2)).thenThrow(new InsufficientStockException(10L, 2, 0));
@@ -598,12 +602,13 @@ class PaymentServiceTest {
             .isInstanceOf(PaymentConfirmExternalException.class)
             .hasRootCauseInstanceOf(InsufficientStockException.class);
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(tossPaymentClient, never()).confirm(any());
         verify(stockService, never()).increase(10L, 2);
         verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updatePendingOrder(123L);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository).save(startedPayment);
     }
 
     @Test
@@ -611,8 +616,9 @@ class PaymentServiceTest {
     void should_restore_already_reserved_stock_when_later_order_line_reservation_fails() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
         when(stockService.decrease(10L, 2)).thenReturn(null);
@@ -623,12 +629,13 @@ class PaymentServiceTest {
             .isInstanceOf(PaymentConfirmExternalException.class)
             .hasRootCauseInstanceOf(InsufficientStockException.class);
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(tossPaymentClient, never()).confirm(any());
         verify(stockService).increase(10L, 2);
         verify(stockService, never()).increase(20L, 1);
         verify(orderClient).updatePendingOrder(123L);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository).save(startedPayment);
     }
 
     @Test
@@ -636,33 +643,35 @@ class PaymentServiceTest {
     void should_restore_reserved_stock_when_toss_confirm_fails_after_stock_reservation() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
         PaymentException tossException = new PaymentException("psp confirm failed");
         AtomicInteger saveCount = new AtomicInteger();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
         when(tossPaymentClient.confirm(any())).thenThrow(tossException);
         doAnswer(invocation -> {
             int currentSaveCount = saveCount.incrementAndGet();
             if (currentSaveCount == 1) {
-                assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-                assertThat(payment.getPaymentKey()).isEqualTo("payment-key-1");
+                assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+                assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             }
             return invocation.getArgument(0);
-        }).when(paymentRepository).save(payment);
+        }).when(paymentRepository).save(startedPayment);
 
         // When, Then
         assertThatThrownBy(() -> paymentService.confirmPayment(request))
             .isInstanceOf(PaymentConfirmExternalException.class)
             .hasRootCauseMessage("psp confirm failed");
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(saveCount).hasValue(1);
         verify(orderClient).updatePendingOrder(123L);
         verify(stockService).increase(10L, 2);
         verify(stockService).increase(20L, 1);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository).save(startedPayment);
     }
 
     @Test
@@ -670,8 +679,9 @@ class PaymentServiceTest {
     void should_fail_payment_without_stock_decrease_when_order_items_are_empty() {
         // Given
         Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
         ConfirmPaymentRequest request = confirmRequest();
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummary(123L, new BigDecimal("100.00")));
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
 
@@ -680,11 +690,12 @@ class PaymentServiceTest {
             .isInstanceOf(PaymentConfirmExternalException.class)
             .hasRootCauseMessage("[Payment] 주문 상품 정보가 없습니다. orderId=123");
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(stockService, never()).decrease(any(), any(Integer.class));
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient).updatePendingOrder(123L);
-        verify(paymentRepository).save(payment);
+        verify(paymentRepository).save(startedPayment);
     }
 
     private OrderSummary createOrderSummary(Long orderId, BigDecimal totalPrice) {
@@ -718,6 +729,23 @@ class PaymentServiceTest {
 
     private Payment notStartedPayment(Long paymentId, Long orderId, BigDecimal amount) {
         return paymentWithStatus(paymentId, orderId, amount, PaymentStatus.NOT_STARTED);
+    }
+
+    private Payment executingPayment(Long paymentId, Long orderId, BigDecimal amount, String paymentKey) {
+        return Payment.builder()
+            .id(paymentId)
+            .orderId(orderId)
+            .paymentKey(paymentKey)
+            .status(PaymentStatus.EXECUTING)
+            .amount(amount)
+            .createdAt(LocalDateTime.now().minusMinutes(1))
+            .expiresAt(LocalDateTime.now().plusMinutes(4))
+            .build();
+    }
+
+    private void mockPaymentLookupBeforeAndAfterCas(Payment beforeCas, Payment afterCas) {
+        when(paymentRepository.findById(beforeCas.getId()))
+            .thenReturn(Optional.of(beforeCas), Optional.of(afterCas));
     }
 
     private Payment paymentWithStatus(Long paymentId, Long orderId, BigDecimal amount, PaymentStatus status) {
