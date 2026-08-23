@@ -17,7 +17,7 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyComplet
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
@@ -45,7 +45,7 @@ public class PaymentService {
 
     private final OrderClient orderClient;
     private final PaymentRepository paymentRepository;
-    private final TossPaymentClient tossPaymentClient;
+    private final TossPaymentGateway tossPaymentClient;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final StockService stockService;
 

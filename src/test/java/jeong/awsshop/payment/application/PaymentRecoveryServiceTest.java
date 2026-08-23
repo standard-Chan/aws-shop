@@ -13,7 +13,7 @@ import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
@@ -33,7 +33,7 @@ class PaymentRecoveryServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
-    private TossPaymentClient tossPaymentClient;
+    private TossPaymentGateway tossPaymentClient;
 
     @Mock
     private OrderClient orderClient;

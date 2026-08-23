@@ -5,7 +5,7 @@ import java.util.List;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
@@ -23,7 +23,7 @@ public class PaymentRecoveryService {
     private static final String TOSS_DONE_STATUS = "DONE";
 
     private final PaymentRepository paymentRepository;
-    private final TossPaymentClient tossPaymentClient;
+    private final TossPaymentGateway tossPaymentClient;
     private final OrderClient orderClient;
     private final StockService stockService;
 

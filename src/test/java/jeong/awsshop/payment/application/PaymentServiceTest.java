@@ -32,7 +32,7 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyComplet
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
@@ -61,7 +61,7 @@ class PaymentServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
-    private TossPaymentClient tossPaymentClient;
+    private TossPaymentGateway tossPaymentClient;
 
     @Mock
     private SnowflakeIdGenerator snowflakeIdGenerator;

@@ -62,3 +62,41 @@ WHERE id = :paymentId
 - CAS 실패 요청은 `409 Conflict`를 반환해야 한다.
 - CAS 실패 요청은 재고 차감, Toss confirm, 주문 pending, Payment failed 저장을 실행하지 않아야 한다.
 - CAS 성공 후 재고 예약 또는 Toss confirm 실패는 기존처럼 실패 보상 로직을 실행해야 한다.
+
+## 병렬 HTTP 검증 설계
+
+결제 승인 동시성 검증은 실제 Toss API 대신 mock Toss gateway를 사용한다. 외부 PSP의 네트워크 지연, 응답 제한, 중복 승인 정책이 섞이면 이번 검증의 관심사인 "우리 DB CAS가 승인 실행권을 1건만 선점하는가"를 분리해서 보기 어렵기 때문이다.
+
+프로필은 기능명인 `payment-confirm-concurrency`를 새로 만들지 않고 기존 실행 환경 기준을 따른다.
+
+- `dev`: `app.payment.toss.mode=mock`
+- `prod`: `app.payment.toss.mode=real`
+- `test`: `app.payment.toss.mode=mock`
+
+이렇게 둔 이유는 실행 환경을 보면 Toss 연동 방식이 바로 드러나고, 나중에 `payment-confirm-concurrency` 같은 임시 검증명 프로필이 남아 의미를 헷갈리게 만들지 않기 위해서다.
+
+dev/mock 모드에서만 다음 검증 API가 열린다.
+
+```text
+POST /test/payment-confirm-concurrency/fixtures
+GET  /test/payment-confirm-concurrency/toss-stats
+GET  /test/payment-confirm-concurrency/fixtures/{paymentId}/result
+```
+
+fixture API는 매 실행마다 상품 2개, 재고, `EXECUTING` 주문, `NOT_STARTED` 결제를 만든다. 이후 k6는 모든 VU가 같은 `paymentId`, `paymentKey`로 `/api/payments/confirm`을 동시에 호출한다.
+
+기대 결과는 다음과 같다.
+
+- `200 OK`: 1건
+- `409 Conflict`: `VU - 1`건
+- mock Toss confirm 호출 수: 1건
+- 최종 Payment 상태: `SUCCESS`
+- 최종 Order 상태: `COMPLETED`
+
+실행 예시는 다음과 같다.
+
+```bash
+BASE_URL=http://localhost:8080 \
+VUS=50 \
+k6 run k6/payment-confirm-concurrency-cas.js
+```

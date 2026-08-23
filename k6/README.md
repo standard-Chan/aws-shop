@@ -106,3 +106,34 @@ k6 run k6/payment-create-duplicate-guard.js
 - 이 테스트는 현재 구현이 "주문당 결제 1개만 생성" 규칙을 각 주문 라운드마다 만족하는지 검증한다.
 - 현재 애플리케이션이 `409 Conflict`를 명시적으로 반환하지 않으면 테스트는 실패한다.
 - 즉, 이 테스트는 부하 시나리오 자체와 함께 필요한 서버 동작 계약도 고정한다.
+
+## Payment confirm CAS 동시 승인 검증
+
+### 목적
+- `POST /api/payments/confirm`에 동일한 `paymentId`로 동시 요청을 보내 결제 승인 시작권이 DB CAS로 1건만 선점되는지 검증한다.
+- 실제 Toss API는 호출하지 않고 `dev` 프로필의 `app.payment.toss.mode=mock` 설정을 사용한다.
+- 기대 응답 분포는 `200` 1건, `409` `VUS - 1`건, 그 외 응답 0건이다.
+- mock Toss confirm 호출 수가 1건인지 최종 확인한다.
+
+### 사전 조건
+애플리케이션을 `dev` 프로필로 실행한다. `application-dev.yml`의 Toss mode는 `mock`이어야 한다.
+
+```bash
+./gradlew bootRun
+```
+
+### 실행
+```bash
+BASE_URL=http://localhost:8080 \
+VUS=50 \
+k6 run k6/payment-confirm-concurrency-cas.js
+```
+
+### 흐름
+- `setup()`에서 `POST /test/payment-confirm-concurrency/fixtures`를 호출해 상품, 재고, 주문, 결제 fixture를 생성한다.
+- 모든 VU가 같은 `paymentId`, `paymentKey`, `orderId`, `amount`로 `/api/payments/confirm`을 호출한다.
+- `teardown()`에서 mock Toss confirm count, Payment 최종 상태, Order 최종 상태를 확인한다.
+
+### 결과
+- 실행 후 `k6/results/payment-confirm-concurrency-cas-summary.json`에 요약 결과가 저장된다.
+- 정상이라면 `payment_confirm_success_200 == 1`, `payment_confirm_conflict_409 == VUS - 1`, `payment_confirm_unexpected == 0`이어야 한다.

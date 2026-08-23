@@ -22,3 +22,8 @@ spring:
       root: info
       org.hibernate.SQL: warn
       org.springframework: warn
+
+app:
+  payment:
+    toss:
+      mode: real

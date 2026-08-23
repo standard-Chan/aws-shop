@@ -18,6 +18,9 @@ spring:
       auto-startup: false
 
 app:
+  payment:
+    toss:
+      mode: mock
   product:
     detail-cache:
       enabled: false
