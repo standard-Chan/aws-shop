@@ -17,6 +17,9 @@ spring:
     hikari:
       maximum-pool-size: 30  # 최대 커넥션 풀 크기
 
+  jpa:
+    open-in-view: false
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}

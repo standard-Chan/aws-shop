@@ -137,3 +137,25 @@ k6 run k6/payment-confirm-concurrency-cas.js
 ### 결과
 - 실행 후 `k6/results/payment-confirm-concurrency-cas-summary.json`에 요약 결과가 저장된다.
 - 정상이라면 `payment_confirm_success_200 == 1`, `payment_confirm_conflict_409 == VUS - 1`, `payment_confirm_unexpected == 0`이어야 한다.
+
+### k6가 없는 환경의 curl 대체 검증
+`k6`가 설치되어 있지 않다면 병렬 `curl`로도 동일한 핵심 계약을 확인할 수 있다.
+
+```bash
+BASE_URL=http://localhost:8080
+FIXTURE=$(curl -s -X POST "$BASE_URL/test/payment-confirm-concurrency/fixtures")
+PAYMENT_ID=$(node -e "const data=JSON.parse(process.argv[1]); console.log(data.paymentId)" "$FIXTURE")
+PAYMENT_KEY=$(node -e "const data=JSON.parse(process.argv[1]); console.log(data.paymentKey)" "$FIXTURE")
+ORDER_ID=$(node -e "const data=JSON.parse(process.argv[1]); console.log(data.orderId)" "$FIXTURE")
+AMOUNT=$(node -e "const data=JSON.parse(process.argv[1]); console.log(data.amount)" "$FIXTURE")
+
+seq 1 50 | xargs -P 50 -I {} curl -s -o /tmp/payment-confirm-{}.json -w "%{http_code}\n" \
+  -X POST "$BASE_URL/api/payments/confirm" \
+  -H "Content-Type: application/json" \
+  -d "{\"paymentKey\":\"$PAYMENT_KEY\",\"paymentId\":\"$PAYMENT_ID\",\"orderId\":$ORDER_ID,\"amount\":$AMOUNT}"
+
+curl -s "$BASE_URL/test/payment-confirm-concurrency/toss-stats"
+curl -s "$BASE_URL/test/payment-confirm-concurrency/fixtures/$PAYMENT_ID/result"
+```
+
+기대 결과는 `200` 1건, `409` 49건, mock Toss confirm count 1건, Payment `SUCCESS`, Order `COMPLETED`이다.
