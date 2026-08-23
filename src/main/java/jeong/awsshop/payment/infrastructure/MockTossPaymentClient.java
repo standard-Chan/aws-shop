@@ -19,6 +19,7 @@ public class MockTossPaymentClient implements TossPaymentGateway {
     private final AtomicInteger confirmCount = new AtomicInteger();
     private final CopyOnWriteArrayList<TossPaymentConfirmRequest> confirmRequests = new CopyOnWriteArrayList<>();
 
+    /** Toss confirm 성공 응답을 반환하고 호출 횟수와 요청 이력을 기록한다. */
     @Override
     public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
         confirmCount.incrementAndGet();
@@ -36,6 +37,7 @@ public class MockTossPaymentClient implements TossPaymentGateway {
         );
     }
 
+    /** 복구 로직에서 조회하는 Toss 결제 상태를 항상 DONE으로 반환한다. */
     @Override
     public TossPaymentConfirmResponse getPayment(String paymentKey) {
         OffsetDateTime now = OffsetDateTime.now();
@@ -50,15 +52,18 @@ public class MockTossPaymentClient implements TossPaymentGateway {
         );
     }
 
+    /** 병렬 검증 fixture 생성 시 이전 mock 호출 이력을 초기화한다. */
     public void reset() {
         confirmCount.set(0);
         confirmRequests.clear();
     }
 
+    /** 현재까지 mock Toss confirm이 호출된 횟수를 반환한다. */
     public int confirmCount() {
         return confirmCount.get();
     }
 
+    /** 현재까지 mock Toss confirm으로 들어온 요청 이력을 복사해 반환한다. */
     public List<TossPaymentConfirmRequest> confirmRequests() {
         return List.copyOf(confirmRequests);
     }

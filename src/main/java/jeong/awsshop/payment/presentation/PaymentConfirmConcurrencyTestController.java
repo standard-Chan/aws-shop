@@ -22,16 +22,19 @@ public class PaymentConfirmConcurrencyTestController {
 
     private final PaymentConfirmConcurrencyFixtureService fixtureService;
 
+    /** 결제 승인 동시성 HTTP 검증에 사용할 fixture를 생성한다. */
     @PostMapping("/fixtures")
     public PaymentConfirmConcurrencyFixtureResponse createFixture() {
         return fixtureService.createFixture();
     }
 
+    /** 특정 fixture 결제의 최종 Payment, Order, 재고 상태를 조회한다. */
     @GetMapping("/fixtures/{paymentId}/result")
     public PaymentConfirmConcurrencyResultResponse getResult(@PathVariable Long paymentId) {
         return fixtureService.getResult(paymentId);
     }
 
+    /** mock Toss confirm 호출 수와 요청 이력을 조회한다. */
     @GetMapping("/toss-stats")
     public PaymentConfirmConcurrencyTossStatsResponse getTossStats() {
         return fixtureService.getTossStats();

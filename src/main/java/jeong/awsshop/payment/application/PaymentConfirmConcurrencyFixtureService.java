@@ -45,6 +45,7 @@ public class PaymentConfirmConcurrencyFixtureService {
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final MockTossPaymentClient mockTossPaymentClient;
 
+    /** 같은 결제 승인 요청을 병렬로 보낼 수 있도록 상품, 재고, 주문, 결제 fixture를 생성한다. */
     @Transactional
     public PaymentConfirmConcurrencyFixtureResponse createFixture() {
         Long firstProductId = snowflakeIdGenerator.nextId();
@@ -92,6 +93,7 @@ public class PaymentConfirmConcurrencyFixtureService {
         );
     }
 
+    /** 병렬 승인 요청 후 Payment, Order, 재고, Toss mock 호출 수의 최종 상태를 조회한다. */
     @Transactional(readOnly = true)
     public PaymentConfirmConcurrencyResultResponse getResult(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
@@ -116,6 +118,7 @@ public class PaymentConfirmConcurrencyFixtureService {
         );
     }
 
+    /** mock Toss confirm 호출 횟수와 요청 이력을 반환해 외부 PSP 호출이 1회인지 검증한다. */
     public PaymentConfirmConcurrencyTossStatsResponse getTossStats() {
         List<MockTossConfirmRequestSnapshot> requests = mockTossPaymentClient.confirmRequests().stream()
             .map(MockTossConfirmRequestSnapshot::from)
@@ -123,6 +126,7 @@ public class PaymentConfirmConcurrencyFixtureService {
         return new PaymentConfirmConcurrencyTossStatsResponse(mockTossPaymentClient.confirmCount(), requests);
     }
 
+    /** 결제 승인 동시성 검증 fixture에서 사용할 테스트 상품을 생성한다. */
     private Product createProduct(Long productId, String suffix, BigDecimal price) {
         return Product.builder()
             .id(productId)
@@ -164,6 +168,7 @@ public class PaymentConfirmConcurrencyFixtureService {
         BigDecimal amount
     ) {
 
+        /** mock Toss 요청 DTO를 검증 응답용 snapshot으로 변환한다. */
         static MockTossConfirmRequestSnapshot from(TossPaymentConfirmRequest request) {
             return new MockTossConfirmRequestSnapshot(
                 String.valueOf(request.orderId()),

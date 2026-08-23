@@ -49,6 +49,7 @@ public class TossPaymentClient implements TossPaymentGateway {
         }
     }
 
+    /** Toss Payments 서버에서 paymentKey에 해당하는 결제 상태를 조회한다. */
     @Override
     public TossPaymentConfirmResponse getPayment(String paymentKey) {
         try {
