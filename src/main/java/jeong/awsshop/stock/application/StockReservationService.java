@@ -1,5 +1,6 @@
 package jeong.awsshop.stock.application;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +58,14 @@ public class StockReservationService {
             StockReservationStatus.RESERVED
         );
         for (StockReservation reservation : reservations) {
+            int updatedCount = stockReservationRepository.markRestoredIfReserved(
+                reservation.getId(),
+                LocalDateTime.now()
+            );
+            if (updatedCount == 0) {
+                continue;
+            }
             stockService.increase(reservation.getProductId(), reservation.getQuantity());
-            reservation.restore();
         }
     }
 

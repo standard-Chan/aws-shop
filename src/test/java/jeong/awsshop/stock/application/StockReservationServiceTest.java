@@ -4,7 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.product.domain.Product;
 import jeong.awsshop.product.repository.ProductRepository;
@@ -79,6 +84,39 @@ class StockReservationServiceTest {
         stockReservationService.restore(3L);
 
         StockReservation reservation = stockReservationRepository.findAllByPaymentId(3L).get(0);
+        assertThat(stockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
+        assertThat(reservation.getStatus()).isEqualTo(StockReservationStatus.RESTORED);
+        assertThat(reservation.getRestoredAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("예약 복구가 동시에 호출되어도 재고 복구는 한 번만 반영해야 한다")
+    void should_restore_reserved_stock_once_when_restore_is_called_concurrently() throws Exception {
+        Product product = saveProductWithStock(nextProductId(), 10);
+        stockReservationService.reserve(5L, 123L, List.of(orderLine(product.getId(), 4)));
+        int threadCount = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (int index = 0; index < threadCount; index++) {
+            futures.add(executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                stockReservationService.restore(5L);
+                return null;
+            }));
+        }
+
+        ready.await();
+        start.countDown();
+        for (Future<?> future : futures) {
+            future.get();
+        }
+        executor.shutdown();
+
+        StockReservation reservation = stockReservationRepository.findAllByPaymentId(5L).get(0);
         assertThat(stockRepository.findByProductId(product.getId()).orElseThrow().getQuantity()).isEqualTo(10);
         assertThat(reservation.getStatus()).isEqualTo(StockReservationStatus.RESTORED);
         assertThat(reservation.getRestoredAt()).isNotNull();

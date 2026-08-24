@@ -59,6 +59,7 @@
 - 예약 row 생성과 `stock.quantity` 차감은 `StockReservationService.reserve()`의 같은 DB 트랜잭션에서 처리한다.
 - Toss confirm은 재고 예약 트랜잭션 밖에서 호출한다.
 - Toss confirm 성공 시 예약 row는 `COMPLETED`로 닫고, 실패 시 `RESERVED` row만 재고 복구 후 `RESTORED`로 닫는다.
+- 예약 복구는 `status=RESERVED` 조건부 update로 먼저 복구 실행권을 선점하고, 선점에 성공한 row만 재고를 증가시켜 병렬 복구의 중복 증가를 막는다.
 - 서버 재시작 복구에서 `EXECUTING` 결제에 예약 row가 없으면 `CAS 성공 후 예약 전 종료`로 판단해 Toss 조회와 재고 복구 없이 결제를 `FAILED`, 주문을 `PENDING`으로 복구한다.
 - 예약 row가 있는 `EXECUTING` 결제는 Toss 상태가 `DONE`이면 `COMPLETED`, 그 외 상태이면 `RESTORED` 기준으로 멱등 복구한다.
 - `payment_id,status` 인덱스는 결제 성공 완료, 실패 복구, 재시작 복구에서 특정 결제의 `RESERVED` 예약만 빠르게 찾기 위한 조회 기준이다.
