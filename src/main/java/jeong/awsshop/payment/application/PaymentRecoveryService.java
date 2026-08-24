@@ -7,10 +7,8 @@ import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
-import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.application.StockReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +23,7 @@ public class PaymentRecoveryService {
     private final PaymentRepository paymentRepository;
     private final TossPaymentGateway tossPaymentClient;
     private final OrderClient orderClient;
-    private final StockService stockService;
+    private final StockReservationService stockReservationService;
 
     /** 
      * 서버 비정상 종료로 인한 결제 상태 불일치 처리
@@ -52,6 +50,11 @@ public class PaymentRecoveryService {
                 return;
             }
 
+            if (!stockReservationService.hasAnyReservation(payment.getId())) {
+                recoverFailedPaymentWithoutReservedStock(payment);
+                return;
+            }
+
             TossPaymentConfirmResponse tossPayment = tossPaymentClient.getPayment(payment.getPaymentKey());
             if (tossPayment != null && TOSS_DONE_STATUS.equals(tossPayment.status())) {
                 recoverSuccessfulPayment(payment);
@@ -69,8 +72,20 @@ public class PaymentRecoveryService {
     private void recoverSuccessfulPayment(Payment payment) {
         payment.complete();
         orderClient.updateCompleteOrder(payment.getOrderId());
+        stockReservationService.complete(payment.getId());
         paymentRepository.save(payment);
         log.info("[Payment-Recovery] 결제 성공 상태를 복구했습니다. paymentId={}, orderId={}",
+            payment.getId(), payment.getOrderId());
+    }
+
+    /** 재고 예약 전 종료된 결제 실패 처리 */
+    private void recoverFailedPaymentWithoutReservedStock(Payment payment) {
+        payment.fail();
+        paymentRepository.save(payment);
+
+        orderClient.updatePendingOrder(payment.getOrderId());
+
+        log.info("[Payment-Recovery] 예약 재고 없이 중단된 결제 상태를 실패로 복구했습니다. paymentId={}, orderId={}",
             payment.getId(), payment.getOrderId());
     }
 
@@ -80,23 +95,9 @@ public class PaymentRecoveryService {
         paymentRepository.save(payment);
 
         orderClient.updatePendingOrder(payment.getOrderId());
-        OrderSummary order = orderClient.getOrder(payment.getOrderId());
-        restoreReservedStocks(order.items());
+        stockReservationService.restore(payment.getId());
 
         log.info("[Payment-Recovery] 결제 실패 상태를 복구했습니다. paymentId={}, orderId={}",
             payment.getId(), payment.getOrderId());
-    }
-
-    /** 재고 복구 처리 */
-    private void restoreReservedStocks(List<OrderLineSummary> reservedLines) {
-        for (int index = reservedLines.size() - 1; index >= 0; index--) {
-            OrderLineSummary line = reservedLines.get(index);
-            try {
-                stockService.increase(line.productId(), line.quantity());
-            } catch (RuntimeException restoreException) {
-                log.error("[Payment-Recovery] 예약 재고 복구 실패. productId={}, quantity={}",
-                    line.productId(), line.quantity(), restoreException);
-            }
-        }
     }
 }

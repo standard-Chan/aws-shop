@@ -9,16 +9,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
-import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
 import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
-import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
-import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.application.StockReservationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +36,7 @@ class PaymentRecoveryServiceTest {
     private OrderClient orderClient;
 
     @Mock
-    private StockService stockService;
+    private StockReservationService stockReservationService;
 
     private PaymentRecoveryService paymentRecoveryService;
 
@@ -49,7 +46,7 @@ class PaymentRecoveryServiceTest {
             paymentRepository,
             tossPaymentClient,
             orderClient,
-            stockService
+            stockReservationService
         );
     }
 
@@ -83,6 +80,7 @@ class PaymentRecoveryServiceTest {
             PaymentStatus.EXECUTING,
             applicationStartupTime
         )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
         when(tossPaymentClient.getPayment("payment-key-1")).thenReturn(tossPayment("DONE"));
 
         // When
@@ -94,8 +92,8 @@ class PaymentRecoveryServiceTest {
         verify(orderClient).updateCompleteOrder(123L);
         verify(paymentRepository).save(payment);
         verify(orderClient, never()).updatePendingOrder(123L);
-        verify(stockService, never()).increase(10L, 2);
-        verify(stockService, never()).increase(20L, 1);
+        verify(stockReservationService).complete(1L);
+        verify(stockReservationService, never()).restore(1L);
     }
 
     @Test
@@ -108,8 +106,8 @@ class PaymentRecoveryServiceTest {
             PaymentStatus.EXECUTING,
             applicationStartupTime
         )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
         when(tossPaymentClient.getPayment("payment-key-1")).thenReturn(tossPayment("ABORTED"));
-        when(orderClient.getOrder(123L)).thenReturn(orderWithItems());
 
         // When
         paymentRecoveryService.recoverExecutingPaymentsBefore(applicationStartupTime);
@@ -118,10 +116,32 @@ class PaymentRecoveryServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(paymentRepository).save(payment);
         verify(orderClient).updatePendingOrder(123L);
-        verify(orderClient).getOrder(123L);
-        verify(stockService).increase(20L, 1);
-        verify(stockService).increase(10L, 2);
+        verify(stockReservationService).restore(1L);
         verify(orderClient, never()).updateCompleteOrder(123L);
+    }
+
+    @Test
+    @DisplayName("CAS 성공 후 예약 전에 종료된 결제는 Toss 조회와 재고 복구 없이 실패 처리해야 한다")
+    void should_fail_payment_without_toss_lookup_and_stock_restore_when_no_reservation_exists() {
+        // Given
+        LocalDateTime applicationStartupTime = LocalDateTime.parse("2026-08-17T10:00:00");
+        Payment payment = executingPayment(1L, 123L, "payment-key-1");
+        when(paymentRepository.findAllByStatusAndCreatedAtBefore(
+            PaymentStatus.EXECUTING,
+            applicationStartupTime
+        )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(false);
+
+        // When
+        paymentRecoveryService.recoverExecutingPaymentsBefore(applicationStartupTime);
+
+        // Then
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(paymentRepository).save(payment);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(tossPaymentClient, never()).getPayment("payment-key-1");
+        verify(stockReservationService, never()).restore(1L);
+        verify(stockReservationService, never()).complete(1L);
     }
 
     @Test
@@ -157,6 +177,8 @@ class PaymentRecoveryServiceTest {
             PaymentStatus.EXECUTING,
             applicationStartupTime
         )).thenReturn(List.of(failedToRecover, recoverable));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
+        when(stockReservationService.hasAnyReservation(2L)).thenReturn(true);
         when(tossPaymentClient.getPayment("payment-key-1")).thenThrow(new RuntimeException("toss lookup failed"));
         when(tossPaymentClient.getPayment("payment-key-2")).thenReturn(tossPayment("DONE"));
 
@@ -167,6 +189,7 @@ class PaymentRecoveryServiceTest {
         assertThat(failedToRecover.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
         assertThat(recoverable.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         verify(orderClient).updateCompleteOrder(456L);
+        verify(stockReservationService).complete(2L);
         verify(paymentRepository).save(recoverable);
     }
 
@@ -194,17 +217,4 @@ class PaymentRecoveryServiceTest {
         );
     }
 
-    private OrderSummary orderWithItems() {
-        return new OrderSummary(
-            123L,
-            1L,
-            OrderStatus.EXECUTING,
-            new BigDecimal("100.00"),
-            "Seoul",
-            List.of(
-                new OrderLineSummary(10L, 2, new BigDecimal("30.00"), new BigDecimal("60.00")),
-                new OrderLineSummary(20L, 1, new BigDecimal("40.00"), new BigDecimal("40.00"))
-            )
-        );
-    }
 }
