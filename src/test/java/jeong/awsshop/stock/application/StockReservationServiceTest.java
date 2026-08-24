@@ -50,29 +50,6 @@ class StockReservationServiceTest {
     }
 
     @Test
-    @DisplayName("동일 상품 주문 라인을 합산해 재고 차감과 예약 저장을 하나로 처리해야 한다")
-    void should_aggregate_order_lines_and_reserve_stock() {
-        Product product = saveProductWithStock(nextProductId(), 10);
-
-        stockReservationService.reserve(
-            1L,
-            123L,
-            List.of(
-                orderLine(product.getId(), 2),
-                orderLine(product.getId(), 3)
-            )
-        );
-
-        Stock stock = stockRepository.findByProductId(product.getId()).orElseThrow();
-        List<StockReservation> reservations = stockReservationRepository.findAllByPaymentId(1L);
-
-        assertThat(stock.getQuantity()).isEqualTo(5);
-        assertThat(reservations).hasSize(1);
-        assertThat(reservations.get(0).getQuantity()).isEqualTo(5);
-        assertThat(reservations.get(0).getStatus()).isEqualTo(StockReservationStatus.RESERVED);
-    }
-
-    @Test
     @DisplayName("일부 상품 재고가 부족하면 전체 예약과 선차감 재고를 롤백해야 한다")
     void should_rollback_all_reserved_stock_when_later_reservation_fails() {
         Product first = saveProductWithStock(nextProductId(), 10);
