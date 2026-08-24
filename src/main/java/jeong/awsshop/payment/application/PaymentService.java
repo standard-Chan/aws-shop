@@ -7,6 +7,7 @@ import jeong.awsshop.order.domain.OrderStatus;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.PaymentAlreadyExecutingException;
 import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
@@ -16,7 +17,7 @@ import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyComplet
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderExpiredException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderLookupException;
-import jeong.awsshop.payment.infrastructure.TossPaymentClient;
+import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
@@ -44,7 +45,7 @@ public class PaymentService {
 
     private final OrderClient orderClient;
     private final PaymentRepository paymentRepository;
-    private final TossPaymentClient tossPaymentClient;
+    private final TossPaymentGateway tossPaymentClient;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final StockService stockService;
 
@@ -137,6 +138,18 @@ public class PaymentService {
 
         // 종료 상태 결제는 승인 시도 실패로 닫지 않고, 승인 흐름 진입 전에 거부한다.
         payment.validateConfirmableStatus();
+        Payment.validatePaymentKey(confirmRequest.paymentKey());
+
+        int updatedCount = paymentRepository.startConfirmIfNotStarted(
+            confirmRequest.paymentId(),
+            confirmRequest.paymentKey()
+        );
+        if (updatedCount == 0) {
+            throw new PaymentAlreadyExecutingException(confirmRequest.paymentId());
+        }
+        payment = paymentRepository.findById(confirmRequest.paymentId())
+            .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
+
         List<OrderLineSummary> reservedLines = List.of();
 
         try {
@@ -144,13 +157,8 @@ public class PaymentService {
             payment.validateOrderId(confirmRequest.orderId());
             payment.validateConfirmAmount(confirmRequest.amount());
 
-            // 결제 승인 처리 시작 및 상태 등록
-            payment.start(confirmRequest.paymentKey());
-
             // 주문 상품 전체 재고 예약 처리
             reservedLines = reserveOrderStocks(order);
-
-            paymentRepository.save(payment);
 
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),

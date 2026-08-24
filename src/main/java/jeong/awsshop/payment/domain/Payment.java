@@ -63,10 +63,14 @@ public class Payment {
     }
 
     private void registerPaymentKey(String paymentKey) {
+        validatePaymentKey(paymentKey);
+        this.paymentKey = paymentKey;
+    }
+
+    public static void validatePaymentKey(String paymentKey) {
         if (paymentKey == null || paymentKey.isBlank()) {
             throw new PaymentInvalidPaymentKey(paymentKey);
         }
-        this.paymentKey = paymentKey;
     }
 
     /** 주문 id 동일 검증 */

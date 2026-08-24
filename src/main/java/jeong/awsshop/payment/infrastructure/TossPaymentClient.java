@@ -7,14 +7,16 @@ import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRe
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
+@ConditionalOnProperty(name = "app.payment.toss.mode", havingValue = "real")
 @Slf4j
-public class TossPaymentClient {
+public class TossPaymentClient implements TossPaymentGateway {
 
     private final RestClient tossPaymentClient;
     private final String secretKey;
@@ -28,6 +30,7 @@ public class TossPaymentClient {
     /**
     * Toss Payments 서버로부터 결제 정보를 받아온다.
     */
+    @Override
     public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
 
         try {
@@ -46,6 +49,8 @@ public class TossPaymentClient {
         }
     }
 
+    /** Toss Payments 서버에서 paymentKey에 해당하는 결제 상태를 조회한다. */
+    @Override
     public TossPaymentConfirmResponse getPayment(String paymentKey) {
         try {
             return tossPaymentClient.get()
