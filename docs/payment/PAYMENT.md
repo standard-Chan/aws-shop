@@ -53,3 +53,29 @@
 - 현재 프로젝트는 Flyway/Liquibase를 쓰지 않는다.
 - `prod`는 `ddl-auto: validate`이므로 운영 DB에는 배포 전에 `payment.order_id` unique index 제거 DDL을 먼저 적용해야 한다.
 - MySQL 기준 예시: `ALTER TABLE payment DROP INDEX uk_payment_order_id;`
+
+## 재고 예약 영속화 기준
+- 결제 승인 CAS 성공 후 주문 라인의 재고를 선차감할 때 `stock_reservation` row를 함께 저장한다.
+- 예약 row 생성과 `stock.quantity` 차감은 `StockReservationService.reserve()`의 같은 DB 트랜잭션에서 처리한다.
+- Toss confirm은 재고 예약 트랜잭션 밖에서 호출한다.
+- Toss confirm 성공 시 예약 row는 `COMPLETED`로 닫고, 실패 시 `RESERVED` row만 재고 복구 후 `RESTORED`로 닫는다.
+- 서버 재시작 복구에서 `EXECUTING` 결제에 예약 row가 없으면 `CAS 성공 후 예약 전 종료`로 판단해 Toss 조회와 재고 복구 없이 결제를 `FAILED`, 주문을 `PENDING`으로 복구한다.
+- 예약 row가 있는 `EXECUTING` 결제는 Toss 상태가 `DONE`이면 `COMPLETED`, 그 외 상태이면 `RESTORED` 기준으로 멱등 복구한다.
+
+### `stock_reservation` 운영 DDL
+```sql
+CREATE TABLE stock_reservation (
+    id BIGINT NOT NULL,
+    payment_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    completed_at DATETIME(6) NULL,
+    restored_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_stock_reservation_payment_product UNIQUE (payment_id, product_id),
+    INDEX idx_stock_reservation_payment_status (payment_id, status)
+);
+```
