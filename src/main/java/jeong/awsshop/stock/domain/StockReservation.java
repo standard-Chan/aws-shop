@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
+// 결제 복구/완료/복구 처리에서 payment_id와 status로 RESERVED 예약을 자주 조회하므로 복합 인덱스를 둔다.
 @Table(
     name = "stock_reservation",
     indexes = @Index(

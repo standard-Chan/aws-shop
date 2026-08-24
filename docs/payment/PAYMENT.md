@@ -61,6 +61,7 @@
 - Toss confirm 성공 시 예약 row는 `COMPLETED`로 닫고, 실패 시 `RESERVED` row만 재고 복구 후 `RESTORED`로 닫는다.
 - 서버 재시작 복구에서 `EXECUTING` 결제에 예약 row가 없으면 `CAS 성공 후 예약 전 종료`로 판단해 Toss 조회와 재고 복구 없이 결제를 `FAILED`, 주문을 `PENDING`으로 복구한다.
 - 예약 row가 있는 `EXECUTING` 결제는 Toss 상태가 `DONE`이면 `COMPLETED`, 그 외 상태이면 `RESTORED` 기준으로 멱등 복구한다.
+- `payment_id,status` 인덱스는 결제 성공 완료, 실패 복구, 재시작 복구에서 특정 결제의 `RESERVED` 예약만 빠르게 찾기 위한 조회 기준이다.
 
 ### `stock_reservation` 운영 DDL
 ```sql

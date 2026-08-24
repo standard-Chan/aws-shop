@@ -46,6 +46,7 @@ public class StockReservationService {
             paymentId,
             StockReservationStatus.RESERVED
         );
+        // 조회한 예약 엔티티의 상태 변경을 JPA dirty checking으로 저장하기 위해 트랜잭션이 필요하다.
         reservations.forEach(StockReservation::complete);
     }
 
