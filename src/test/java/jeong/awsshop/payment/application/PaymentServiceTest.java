@@ -3,6 +3,8 @@ package jeong.awsshop.payment.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -27,6 +29,9 @@ import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentInvalidPaymentKey;
 import jeong.awsshop.payment.exception.PaymentInvalidStatusException;
+import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
+import jeong.awsshop.payment.exception.PaymentTossPaymentProcessingException;
+import jeong.awsshop.payment.exception.TossPaymentFailureType;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
@@ -350,7 +355,7 @@ class PaymentServiceTest {
         mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
-        when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+        when(tossPaymentClient.confirm(any(), eq("1"))).thenReturn(tossResponse);
         when(paymentRepository.save(startedPayment)).thenAnswer(invocation -> invocation.getArgument(0));
         doAnswer(invocation -> {
             assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
@@ -373,7 +378,7 @@ class PaymentServiceTest {
         InOrder inOrder = inOrder(stockReservationService, paymentRepository, tossPaymentClient);
         inOrder.verify(paymentRepository).startConfirmIfNotStarted(1L, "payment-key-1");
         inOrder.verify(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
-        inOrder.verify(tossPaymentClient).confirm(any());
+        inOrder.verify(tossPaymentClient).confirm(any(), eq("1"));
         inOrder.verify(stockReservationService).complete(1L);
         inOrder.verify(paymentRepository).save(startedPayment);
     }
@@ -390,7 +395,7 @@ class PaymentServiceTest {
         mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
-        when(tossPaymentClient.confirm(any())).thenReturn(tossResponse);
+        when(tossPaymentClient.confirm(any(), eq("1"))).thenReturn(tossResponse);
         doAnswer(invocation -> {
             assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
             assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
@@ -413,7 +418,7 @@ class PaymentServiceTest {
         InOrder inOrder = inOrder(stockReservationService, paymentRepository, tossPaymentClient);
         inOrder.verify(paymentRepository).startConfirmIfNotStarted(1L, "payment-key-1");
         inOrder.verify(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
-        inOrder.verify(tossPaymentClient).confirm(any());
+        inOrder.verify(tossPaymentClient).confirm(any(), eq("1"));
         inOrder.verify(stockReservationService).complete(1L);
         inOrder.verify(paymentRepository).save(startedPayment);
     }
@@ -437,7 +442,7 @@ class PaymentServiceTest {
         assertThat(payment.getPaymentKey()).isNull();
         verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(stockReservationService, never()).restore(any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(orderClient, never()).updatePendingOrder(123L);
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(paymentRepository, never()).save(payment);
@@ -464,7 +469,7 @@ class PaymentServiceTest {
 
         verify(paymentRepository, never()).startConfirmIfNotStarted(any(), any());
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
     }
 
     @Test
@@ -489,7 +494,7 @@ class PaymentServiceTest {
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(stockReservationService, never()).restore(any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
     }
 
     @Test
@@ -510,7 +515,7 @@ class PaymentServiceTest {
         verify(paymentRepository, never()).save(payment);
         verify(orderClient, never()).updatePendingOrder(123L);
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
     }
 
     @Test
@@ -532,7 +537,7 @@ class PaymentServiceTest {
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
     }
@@ -556,7 +561,7 @@ class PaymentServiceTest {
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
     }
@@ -580,7 +585,7 @@ class PaymentServiceTest {
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
     }
@@ -606,7 +611,7 @@ class PaymentServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(stockReservationService).restore(1L);
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
@@ -633,7 +638,7 @@ class PaymentServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(stockReservationService).restore(1L);
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
@@ -651,7 +656,7 @@ class PaymentServiceTest {
         mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
-        when(tossPaymentClient.confirm(any())).thenThrow(tossException);
+        when(tossPaymentClient.confirm(any(), eq("1"))).thenThrow(tossException);
         doAnswer(invocation -> {
             int currentSaveCount = saveCount.incrementAndGet();
             if (currentSaveCount == 1) {
@@ -669,6 +674,118 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(saveCount).hasValue(1);
+        verify(orderClient).updatePendingOrder(123L);
+        verify(stockReservationService).restore(1L);
+        verify(paymentRepository).save(startedPayment);
+    }
+
+    @Test
+    @DisplayName("Toss 승인 결과가 불확실해도 조회 결과가 DONE이면 결제를 성공 처리해야 한다")
+    void should_complete_payment_when_uncertain_toss_confirm_is_done_on_lookup() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
+        ConfirmPaymentRequest request = confirmRequest();
+        TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
+        when(tossPaymentClient.confirm(any(), eq("1")))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "PROVIDER_ERROR", 400));
+        when(tossPaymentClient.getPayment("payment-key-1")).thenReturn(tossResponse);
+        when(paymentRepository.save(startedPayment)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
+
+        // Then
+        assertThat(response).isEqualTo(tossResponse);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(orderClient).updateCompleteOrder(123L);
+        verify(stockReservationService).complete(1L);
+        verify(stockReservationService, never()).restore(1L);
+        verify(paymentRepository).save(startedPayment);
+    }
+
+    @Test
+    @DisplayName("Toss 승인 결과와 조회 결과가 모두 불확실하면 EXECUTING 상태를 유지해야 한다")
+    void should_keep_executing_when_toss_confirm_and_lookup_are_uncertain() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
+        ConfirmPaymentRequest request = confirmRequest();
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
+        when(tossPaymentClient.confirm(any(), eq("1")))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "PROVIDER_ERROR", 400));
+        when(tossPaymentClient.getPayment("payment-key-1"))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "FAILED_INTERNAL_SYSTEM_PROCESSING", 500));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentRecoveryRequiredException.class)
+            .hasMessage("[Payment] 결제 처리 상태를 복구했습니다. 다시 시도해주세요. orderId=123");
+
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+        verify(paymentRepository, never()).save(startedPayment);
+        verify(orderClient, never()).updatePendingOrder(123L);
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(stockReservationService, never()).restore(1L);
+        verify(stockReservationService, never()).complete(1L);
+    }
+
+    @Test
+    @DisplayName("Toss 조회 결과 결제 기록이 없으면 같은 멱등키로 confirm을 1회 재시도해야 한다")
+    void should_retry_confirm_once_with_same_idempotency_key_when_toss_lookup_has_no_payment() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
+        ConfirmPaymentRequest request = confirmRequest();
+        TossPaymentConfirmResponse tossResponse = tossConfirmResponse();
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
+        when(tossPaymentClient.confirm(any(), eq("1")))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "PROVIDER_ERROR", 400))
+            .thenReturn(tossResponse);
+        when(tossPaymentClient.getPayment("payment-key-1"))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "NOT_FOUND_PAYMENT", 404));
+        when(paymentRepository.save(startedPayment)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
+
+        // Then
+        assertThat(response).isEqualTo(tossResponse);
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(tossPaymentClient, times(2)).confirm(any(), eq("1"));
+        verify(orderClient).updateCompleteOrder(123L);
+        verify(stockReservationService).complete(1L);
+        verify(stockReservationService, never()).restore(1L);
+    }
+
+    @Test
+    @DisplayName("Toss 승인 확정 실패는 결제를 실패 처리하고 예약 재고를 복구해야 한다")
+    void should_fail_payment_and_restore_stock_when_toss_confirm_failure_is_confirmed() {
+        // Given
+        Payment payment = notStartedPayment(1L, 123L, new BigDecimal("100.00"));
+        Payment startedPayment = executingPayment(1L, 123L, new BigDecimal("100.00"), "payment-key-1");
+        ConfirmPaymentRequest request = confirmRequest();
+        mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
+        when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
+        when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
+        when(tossPaymentClient.confirm(any(), eq("1")))
+            .thenThrow(tossException(TossPaymentFailureType.CONFIRMED_FAILURE, "INVALID_REQUEST", 400));
+        when(paymentRepository.save(startedPayment)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When, Then
+        assertThatThrownBy(() -> paymentService.confirmPayment(request))
+            .isInstanceOf(PaymentConfirmExternalException.class)
+            .hasCauseInstanceOf(PaymentTossPaymentProcessingException.class);
+
+        assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(tossPaymentClient, never()).getPayment("payment-key-1");
         verify(orderClient).updatePendingOrder(123L);
         verify(stockReservationService).restore(1L);
         verify(paymentRepository).save(startedPayment);
@@ -693,7 +810,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(stockReservationService, never()).reserve(any(), any(), any());
-        verify(tossPaymentClient, never()).confirm(any());
+        verify(tossPaymentClient, never()).confirm(any(), anyString());
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
     }
@@ -788,6 +905,22 @@ class PaymentServiceTest {
             140000L,
             OffsetDateTime.parse("2026-05-25T10:15:30+09:00"),
             OffsetDateTime.parse("2026-05-25T10:16:00+09:00")
+        );
+    }
+
+    private PaymentTossPaymentProcessingException tossException(
+        TossPaymentFailureType failureType,
+        String tossErrorCode,
+        Integer httpStatus
+    ) {
+        return new PaymentTossPaymentProcessingException(
+            1L,
+            "payment-key-1",
+            tossErrorCode,
+            httpStatus,
+            failureType,
+            "toss failed",
+            new RuntimeException("toss failed")
         );
     }
 }

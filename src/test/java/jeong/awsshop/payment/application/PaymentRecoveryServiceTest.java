@@ -1,7 +1,10 @@
 package jeong.awsshop.payment.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +15,8 @@ import java.util.List;
 import jeong.awsshop.payment.domain.Payment;
 import jeong.awsshop.payment.domain.PaymentRepository;
 import jeong.awsshop.payment.domain.PaymentStatus;
+import jeong.awsshop.payment.exception.PaymentTossPaymentProcessingException;
+import jeong.awsshop.payment.exception.TossPaymentFailureType;
 import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
@@ -121,6 +126,84 @@ class PaymentRecoveryServiceTest {
     }
 
     @Test
+    @DisplayName("Toss 조회 상태가 미완료이면 같은 멱등키로 confirm을 1회 재시도해야 한다")
+    void should_retry_confirm_once_when_toss_lookup_status_is_not_finished() {
+        // Given
+        LocalDateTime applicationStartupTime = LocalDateTime.parse("2026-08-17T10:00:00");
+        Payment payment = executingPayment(1L, 123L, "payment-key-1");
+        when(paymentRepository.findAllByStatusAndCreatedAtBefore(
+            PaymentStatus.EXECUTING,
+            applicationStartupTime
+        )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
+        when(tossPaymentClient.getPayment("payment-key-1")).thenReturn(tossPayment("READY"));
+        when(tossPaymentClient.confirm(any(), eq("1"))).thenReturn(tossPayment("DONE"));
+
+        // When
+        paymentRecoveryService.recoverExecutingPaymentsBefore(applicationStartupTime);
+
+        // Then
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(tossPaymentClient).confirm(any(), eq("1"));
+        verify(orderClient).updateCompleteOrder(123L);
+        verify(stockReservationService).complete(1L);
+        verify(stockReservationService, never()).restore(1L);
+    }
+
+    @Test
+    @DisplayName("Toss 조회 결과 결제 기록이 없으면 confirm을 1회 재시도해야 한다")
+    void should_retry_confirm_once_when_toss_lookup_has_no_payment() {
+        // Given
+        LocalDateTime applicationStartupTime = LocalDateTime.parse("2026-08-17T10:00:00");
+        Payment payment = executingPayment(1L, 123L, "payment-key-1");
+        when(paymentRepository.findAllByStatusAndCreatedAtBefore(
+            PaymentStatus.EXECUTING,
+            applicationStartupTime
+        )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
+        when(tossPaymentClient.getPayment("payment-key-1"))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "NOT_FOUND_PAYMENT", 404));
+        when(tossPaymentClient.confirm(any(), eq("1"))).thenReturn(tossPayment("DONE"));
+
+        // When
+        paymentRecoveryService.recoverExecutingPaymentsBefore(applicationStartupTime);
+
+        // Then
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(tossPaymentClient).confirm(any(), eq("1"));
+        verify(orderClient).updateCompleteOrder(123L);
+        verify(stockReservationService).complete(1L);
+    }
+
+    @Test
+    @DisplayName("Toss 조회와 confirm 재시도가 모두 불확실하면 EXECUTING 상태를 유지해야 한다")
+    void should_keep_executing_when_lookup_and_retry_confirm_are_uncertain() {
+        // Given
+        LocalDateTime applicationStartupTime = LocalDateTime.parse("2026-08-17T10:00:00");
+        Payment payment = executingPayment(1L, 123L, "payment-key-1");
+        when(paymentRepository.findAllByStatusAndCreatedAtBefore(
+            PaymentStatus.EXECUTING,
+            applicationStartupTime
+        )).thenReturn(List.of(payment));
+        when(stockReservationService.hasAnyReservation(1L)).thenReturn(true);
+        when(tossPaymentClient.getPayment("payment-key-1")).thenReturn(tossPayment("READY"));
+        when(tossPaymentClient.confirm(any(), eq("1")))
+            .thenThrow(tossException(TossPaymentFailureType.UNCERTAIN, "PROVIDER_ERROR", 400));
+
+        // When
+        paymentRecoveryService.recoverExecutingPaymentsBefore(applicationStartupTime);
+
+        // Then
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
+        verify(tossPaymentClient, times(1)).confirm(any(), eq("1"));
+        verify(paymentRepository, never()).save(payment);
+        verify(orderClient, never()).updateCompleteOrder(123L);
+        verify(orderClient, never()).updatePendingOrder(123L);
+        verify(stockReservationService, never()).complete(1L);
+        verify(stockReservationService, never()).restore(1L);
+    }
+
+    @Test
     @DisplayName("CAS 성공 후 예약 전에 종료된 결제는 Toss 조회와 재고 복구 없이 실패 처리해야 한다")
     void should_fail_payment_without_toss_lookup_and_stock_restore_when_no_reservation_exists() {
         // Given
@@ -214,6 +297,22 @@ class PaymentRecoveryServiceTest {
             140000L,
             OffsetDateTime.parse("2026-08-17T09:50:00+09:00"),
             OffsetDateTime.parse("2026-08-17T09:51:00+09:00")
+        );
+    }
+
+    private PaymentTossPaymentProcessingException tossException(
+        TossPaymentFailureType failureType,
+        String tossErrorCode,
+        Integer httpStatus
+    ) {
+        return new PaymentTossPaymentProcessingException(
+            1L,
+            "payment-key-1",
+            tossErrorCode,
+            httpStatus,
+            failureType,
+            "toss failed",
+            new RuntimeException("toss failed")
         );
     }
 
