@@ -26,7 +26,7 @@ import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRe
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
-import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.application.StockReservationService;
 import jeong.awsshop.stock.exception.StockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final TossPaymentGateway tossPaymentClient;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
-    private final StockService stockService;
+    private final StockReservationService stockReservationService;
 
     /**
      * 주문 id에 해당하는 결제를 생성하여 반환한다.
@@ -150,15 +150,13 @@ public class PaymentService {
         payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
-        List<OrderLineSummary> reservedLines = List.of();
-
         try {
             // 결제 로직 검증
             payment.validateOrderId(confirmRequest.orderId());
             payment.validateConfirmAmount(confirmRequest.amount());
 
             // 주문 상품 전체 재고 예약 처리
-            reservedLines = reserveOrderStocks(order);
+            reserveOrderStocks(payment.getId(), order);
 
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
@@ -173,6 +171,7 @@ public class PaymentService {
             // Order 완료 처리
             orderClient.updateCompleteOrder(payment.getOrderId());
 
+            stockReservationService.complete(payment.getId());
             paymentRepository.save(payment);
             return response;
         } catch (PaymentException | StockException exception) {
@@ -183,7 +182,7 @@ public class PaymentService {
             // Order 상태 pending 변경
             orderClient.updatePendingOrder(payment.getOrderId());
 
-            restoreReservedStocks(reservedLines);
+            stockReservationService.restore(payment.getId());
 
             log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
@@ -227,35 +226,12 @@ public class PaymentService {
             "결제 승인 가능한 주문 상태가 아닙니다. status=" + status);
     }
 
-    private List<OrderLineSummary> reserveOrderStocks(OrderSummary order) {
+    private void reserveOrderStocks(Long paymentId, OrderSummary order) {
         List<OrderLineSummary> orderLines = order.items();
         if (orderLines.isEmpty()) {
             throw new PaymentException("[Payment] 주문 상품 정보가 없습니다. orderId=" + order.orderId());
         }
 
-        List<OrderLineSummary> reservedLines = new java.util.ArrayList<>();
-        try {
-            for (OrderLineSummary line : orderLines) {
-                stockService.decrease(line.productId(), line.quantity());
-                reservedLines.add(line);
-            }
-        } catch (PaymentException | StockException exception) {
-            restoreReservedStocks(reservedLines);
-            throw exception;
-        }
-
-        return reservedLines;
-    }
-
-    private void restoreReservedStocks(List<OrderLineSummary> reservedLines) {
-        for (int index = reservedLines.size() - 1; index >= 0; index--) {
-            OrderLineSummary line = reservedLines.get(index);
-            try {
-                stockService.increase(line.productId(), line.quantity());
-            } catch (RuntimeException restoreException) {
-                log.error("[Payment] 예약 재고 복구 실패. productId={}, quantity={}",
-                    line.productId(), line.quantity(), restoreException);
-            }
-        }
+        stockReservationService.reserve(paymentId, order.orderId(), orderLines);
     }
 }

@@ -40,7 +40,7 @@ import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRe
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
 import jeong.awsshop.payment.presentation.dto.CreatePaymentRequest;
 import jeong.awsshop.payment.presentation.dto.PaymentResponse;
-import jeong.awsshop.stock.application.StockService;
+import jeong.awsshop.stock.application.StockReservationService;
 import jeong.awsshop.stock.exception.InsufficientStockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,7 +67,7 @@ class PaymentServiceTest {
     private SnowflakeIdGenerator snowflakeIdGenerator;
 
     @Mock
-    private StockService stockService;
+    private StockReservationService stockReservationService;
 
     private PaymentService paymentService;
 
@@ -78,7 +78,7 @@ class PaymentServiceTest {
             paymentRepository,
             tossPaymentClient,
             snowflakeIdGenerator,
-            stockService
+            stockReservationService
         );
     }
 
@@ -356,7 +356,7 @@ class PaymentServiceTest {
             assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
             assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             return null;
-        }).when(stockService).decrease(10L, 2);
+        }).when(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
 
         // When
         TossPaymentConfirmResponse response = paymentService.confirmPayment(request);
@@ -365,16 +365,16 @@ class PaymentServiceTest {
         assertThat(response).isEqualTo(tossResponse);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        verify(stockService, never()).increase(10L, 2);
-        verify(stockService, never()).increase(20L, 1);
+        verify(stockReservationService, never()).restore(1L);
+        verify(stockReservationService).complete(1L);
         verify(orderClient).updateCompleteOrder(123L);
         verify(paymentRepository).save(startedPayment);
 
-        InOrder inOrder = inOrder(stockService, paymentRepository, tossPaymentClient);
+        InOrder inOrder = inOrder(stockReservationService, paymentRepository, tossPaymentClient);
         inOrder.verify(paymentRepository).startConfirmIfNotStarted(1L, "payment-key-1");
-        inOrder.verify(stockService).decrease(10L, 2);
-        inOrder.verify(stockService).decrease(20L, 1);
+        inOrder.verify(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
         inOrder.verify(tossPaymentClient).confirm(any());
+        inOrder.verify(stockReservationService).complete(1L);
         inOrder.verify(paymentRepository).save(startedPayment);
     }
 
@@ -395,7 +395,7 @@ class PaymentServiceTest {
             assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.EXECUTING);
             assertThat(startedPayment.getPaymentKey()).isEqualTo("payment-key-1");
             return null;
-        }).when(stockService).decrease(10L, 2);
+        }).when(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
         doAnswer(invocation -> {
             int currentSaveCount = saveCount.incrementAndGet();
             if (currentSaveCount == 1) {
@@ -410,11 +410,11 @@ class PaymentServiceTest {
 
         // Then
         assertThat(saveCount).hasValue(1);
-        InOrder inOrder = inOrder(stockService, paymentRepository, tossPaymentClient);
+        InOrder inOrder = inOrder(stockReservationService, paymentRepository, tossPaymentClient);
         inOrder.verify(paymentRepository).startConfirmIfNotStarted(1L, "payment-key-1");
-        inOrder.verify(stockService).decrease(10L, 2);
-        inOrder.verify(stockService).decrease(20L, 1);
+        inOrder.verify(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
         inOrder.verify(tossPaymentClient).confirm(any());
+        inOrder.verify(stockReservationService).complete(1L);
         inOrder.verify(paymentRepository).save(startedPayment);
     }
 
@@ -435,8 +435,8 @@ class PaymentServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(payment.getPaymentKey()).isNull();
-        verify(stockService, never()).decrease(any(), any(Integer.class));
-        verify(stockService, never()).increase(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
+        verify(stockReservationService, never()).restore(any());
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient, never()).updatePendingOrder(123L);
         verify(orderClient, never()).updateCompleteOrder(123L);
@@ -463,7 +463,7 @@ class PaymentServiceTest {
             .hasMessage("[Payment] PaymentKey가 유효하지 않습니다. ");
 
         verify(paymentRepository, never()).startConfirmIfNotStarted(any(), any());
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
     }
 
@@ -487,8 +487,8 @@ class PaymentServiceTest {
         verify(orderClient).getOrder(123L);
         verify(orderClient).updatePendingOrder(123L);
         verify(orderClient, never()).updateCompleteOrder(123L);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
-        verify(stockService, never()).increase(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
+        verify(stockReservationService, never()).restore(any());
         verify(tossPaymentClient, never()).confirm(any());
     }
 
@@ -509,7 +509,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         verify(paymentRepository, never()).save(payment);
         verify(orderClient, never()).updatePendingOrder(123L);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
     }
 
@@ -531,7 +531,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
@@ -555,7 +555,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
@@ -579,7 +579,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(payment.getPaymentKey()).isNull();
         verify(paymentRepository, never()).save(payment);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient, never()).updateCompleteOrder(123L);
         verify(orderClient, never()).updatePendingOrder(123L);
@@ -595,7 +595,9 @@ class PaymentServiceTest {
         mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
-        when(stockService.decrease(10L, 2)).thenThrow(new InsufficientStockException(10L, 2, 0));
+        doAnswer(invocation -> {
+            throw new InsufficientStockException(10L, 2, 0);
+        }).when(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
 
         // When, Then
         assertThatThrownBy(() -> paymentService.confirmPayment(request))
@@ -605,8 +607,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(tossPaymentClient, never()).confirm(any());
-        verify(stockService, never()).increase(10L, 2);
-        verify(stockService, never()).increase(20L, 1);
+        verify(stockReservationService).restore(1L);
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
     }
@@ -621,8 +622,9 @@ class PaymentServiceTest {
         mockPaymentLookupBeforeAndAfterCas(payment, startedPayment);
         when(orderClient.getOrder(123L)).thenReturn(createOrderSummaryWithItems());
         when(paymentRepository.startConfirmIfNotStarted(1L, "payment-key-1")).thenReturn(1);
-        when(stockService.decrease(10L, 2)).thenReturn(null);
-        when(stockService.decrease(20L, 1)).thenThrow(new InsufficientStockException(20L, 1, 0));
+        doAnswer(invocation -> {
+            throw new InsufficientStockException(20L, 1, 0);
+        }).when(stockReservationService).reserve(1L, 123L, createOrderSummaryWithItems().items());
 
         // When, Then
         assertThatThrownBy(() -> paymentService.confirmPayment(request))
@@ -632,8 +634,7 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         verify(tossPaymentClient, never()).confirm(any());
-        verify(stockService).increase(10L, 2);
-        verify(stockService, never()).increase(20L, 1);
+        verify(stockReservationService).restore(1L);
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
     }
@@ -669,8 +670,7 @@ class PaymentServiceTest {
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(saveCount).hasValue(1);
         verify(orderClient).updatePendingOrder(123L);
-        verify(stockService).increase(10L, 2);
-        verify(stockService).increase(20L, 1);
+        verify(stockReservationService).restore(1L);
         verify(paymentRepository).save(startedPayment);
     }
 
@@ -692,7 +692,7 @@ class PaymentServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.NOT_STARTED);
         assertThat(startedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        verify(stockService, never()).decrease(any(), any(Integer.class));
+        verify(stockReservationService, never()).reserve(any(), any(), any());
         verify(tossPaymentClient, never()).confirm(any());
         verify(orderClient).updatePendingOrder(123L);
         verify(paymentRepository).save(startedPayment);
