@@ -15,7 +15,14 @@
 - [Redis 캐싱을 통한 상품 상세 조회 속도 개선한 방법](https://app.notion.com/p/Cache-DB-3a5fc6c6670180aab9f5e62dfc8b488a?source=copy_link)
 - [실시간 인기 랭킹 제품 조회 시, Redis가 아닌 Clickhous를 사용한 이유](https://app.notion.com/p/Raking-Redis-ClickHouse-39cfc6c667018095bed9c308138b3468?source=copy_link)
 
-### 사용자 행동 이벤트
+### 결제 처리
+- [결제 성공 후, 서버 장애시 정합성이 깨질 수 있는 문제](https://app.notion.com/p/3c6fc6c6670180dba9cde78275d23697?source=copy_link) : PR[#6](https://github.com/standard-Chan/aws-shop/pull/6)
+- [결제 이중 승인 문제](https://app.notion.com/p/3c6fc6c66701806888d6c79ae6018ff3?source=copy_link) : PR[#7](https://github.com/standard-Chan/aws-shop/pull/7)
+
+### 재고 처리
+- [재고 예약 후, 서버 장애 시 재고가 소실되는 문제](https://app.notion.com/p/3c6fc6c6670180258465f24685efa25f?source=copy_link) : PR[#8](https://github.com/standard-Chan/aws-shop/pull/8)
+
+### 사용자 행동 이벤트 수집
 - [RPS 5000 사용자 행동 이벤트 트래픽 처리하기](https://app.notion.com/p/Ranking-RPS-5000-39cfc6c6670180d3b460f6cf054c2c6a?source=copy_link)
 
 ### 상품 데이터 업로드
