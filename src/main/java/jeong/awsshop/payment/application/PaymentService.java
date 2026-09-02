@@ -12,6 +12,9 @@ import jeong.awsshop.payment.exception.PaymentConfirmExternalException;
 import jeong.awsshop.payment.exception.PaymentException;
 import jeong.awsshop.payment.exception.PaymentExpiredException;
 import jeong.awsshop.payment.exception.PaymentNotFoundException;
+import jeong.awsshop.payment.exception.PaymentRecoveryRequiredException;
+import jeong.awsshop.payment.exception.PaymentTossPaymentProcessingException;
+import jeong.awsshop.payment.exception.TossPaymentFailureType;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCanceledException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyCompletedException;
 import jeong.awsshop.payment.exception.infrastructure.PaymentOrderAlreadyExecutingException;
@@ -21,6 +24,7 @@ import jeong.awsshop.payment.infrastructure.TossPaymentGateway;
 import jeong.awsshop.payment.infrastructure.order.OrderClient;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderLineSummary;
 import jeong.awsshop.payment.infrastructure.order.dto.OrderSummary;
+import jeong.awsshop.payment.infrastructure.tosspayment.TossPaymentStatus;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import jeong.awsshop.payment.presentation.dto.ConfirmPaymentRequest;
@@ -38,6 +42,7 @@ import org.springframework.stereotype.Service;
 public class PaymentService {
 
     private static final long PAYMENT_EXPIRATION_MINUTES = 5L;
+    private static final String TOSS_NOT_FOUND_PAYMENT_CODE = "NOT_FOUND_PAYMENT";
     private static final List<PaymentStatus> ACTIVE_PAYMENT_STATUSES = List.of(
         PaymentStatus.NOT_STARTED,
         PaymentStatus.EXECUTING
@@ -119,9 +124,9 @@ public class PaymentService {
      * 다음 값이 초기화되면 안되는 값에 해당합니다. - paymentKey 등록 - status로 변경 (결제 진행 시 : EXECUTING , 실패 시 : FAILD)
      */
     public TossPaymentConfirmResponse confirmPayment(ConfirmPaymentRequest confirmRequest) {
-        log.info("[Payment] 결제 승인 요청, 결제 정보 : 결제 id={}, 주문 id={}, 결제 금액={}",
+        log.info("[Payment] 결제 승인 요청, 결제 정보 : paymentKey={}, 결제 id={}, 주문 id={}, 결제 금액={}",
             confirmRequest.paymentKey(),
-            confirmRequest.orderId(), confirmRequest.amount());
+            confirmRequest.paymentId(), confirmRequest.orderId(), confirmRequest.amount());
 
         Payment payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
@@ -147,6 +152,7 @@ public class PaymentService {
         if (updatedCount == 0) {
             throw new PaymentAlreadyExecutingException(confirmRequest.paymentId());
         }
+        // 결제 승인 요청 시점에, Payment가 이미 다른 프로세스에서 승인 중일 수 있으므로(동시성문제), DB에서 가져온 Payment를 사용한다.
         payment = paymentRepository.findById(confirmRequest.paymentId())
             .orElseThrow(() -> new PaymentNotFoundException(confirmRequest.paymentId()));
 
@@ -160,29 +166,15 @@ public class PaymentService {
 
             TossPaymentConfirmResponse response = tossPaymentClient.confirm(
                 new TossPaymentConfirmRequest(confirmRequest.paymentId(),
-                    confirmRequest.paymentKey(), confirmRequest.amount()));
+                    confirmRequest.paymentKey(), confirmRequest.amount()),
+                String.valueOf(confirmRequest.paymentId()));
 
-            // 결제 승인 완료
-            payment.complete();
-
-            log.info("[Payment] 결제 승인 완료. paymentKey={}, paymentId={}, amount={}",
-                response.paymentKey(), response.orderId(), response.totalAmount());
-
-            // Order 완료 처리
-            orderClient.updateCompleteOrder(payment.getOrderId());
-
-            stockReservationService.complete(payment.getId());
-            paymentRepository.save(payment);
-            return response;
+            return completePayment(payment, response);
+        } catch (PaymentTossPaymentProcessingException exception) { // Toss confirm 실패 유형에 따라 확정 실패와 결과 불확실을 분리
+            return handleTossConfirmFailure(confirmRequest, payment, exception);
         } catch (PaymentException | StockException exception) {
             // 해당 결제 실패 처리
-            payment.fail();
-            paymentRepository.save(payment);
-
-            // Order 상태 pending 변경
-            orderClient.updatePendingOrder(payment.getOrderId());
-
-            stockReservationService.restore(payment.getId());
+            failPaymentAndRestore(payment);
 
             log.warn("[Payment] 결제 실패. {} \n paymentKey={}, orderId={}, amount={}", exception,
                 confirmRequest.paymentKey(), confirmRequest.orderId(), confirmRequest.amount());
@@ -233,5 +225,122 @@ public class PaymentService {
         }
 
         stockReservationService.reserve(paymentId, order.orderId(), orderLines);
+    }
+
+    /** Toss confirm 실패를 확정 실패와 결과 불확실(네트워크 장애) 케이스로 나눠 후속 처리 */
+    private TossPaymentConfirmResponse handleTossConfirmFailure(
+        ConfirmPaymentRequest request,
+        Payment payment,
+        PaymentTossPaymentProcessingException exception
+    ) {
+        if (exception.getFailureType() == TossPaymentFailureType.CONFIRMED_FAILURE) { // Toss가 결제 실패를 확정 응답한 경우
+            failPaymentAndRestore(payment);
+            log.warn("[Payment] Toss 결제 승인 확정 실패. paymentId={}, paymentKey={}, tossCode={}, httpStatus={}",
+                request.paymentId(), request.paymentKey(), exception.getTossErrorCode(), exception.getHttpStatus());
+            throw new PaymentConfirmExternalException(request.paymentId(), request.paymentKey(), exception);
+        }
+
+        log.warn("[Payment] Toss 결제 승인 결과 불확실. 즉시 복구를 시도합니다. paymentId={}, paymentKey={}, failureType={}, tossCode={}, httpStatus={}",
+            request.paymentId(), request.paymentKey(), exception.getFailureType(), exception.getTossErrorCode(),
+            exception.getHttpStatus());
+
+        return recoverUncertainTossConfirm(request, payment, exception);
+    }
+
+    /** 결과가 불확실한 Toss confirm을 조회와 1회 재시도 시도 */
+    private TossPaymentConfirmResponse recoverUncertainTossConfirm(
+        ConfirmPaymentRequest request,
+        Payment payment,
+        PaymentTossPaymentProcessingException cause
+    ) {
+        TossPaymentConfirmResponse lookupResult = lookupTossPaymentForRecovery(request, payment);
+        if (lookupResult != null) {
+            if (TossPaymentStatus.isDone(lookupResult.status())) { // Toss 조회 결과 결제 완료 상태인 경우
+                return completePayment(payment, lookupResult);
+            }
+            if (TossPaymentStatus.isFailed(lookupResult.status())) { // Toss 조회 결과 결제 실패 상태인 경우
+                failPaymentAndRestore(payment);
+                throw new PaymentConfirmExternalException(request.paymentId(), request.paymentKey(), cause);
+            }
+        }
+
+        return retryConfirmOnceForRecovery(request, payment);
+    }
+
+    /** paymentKey로 Toss 결제 상태를 조회하고, 조회 불가 시 후속 복구 대상으로 남긴다. */
+    private TossPaymentConfirmResponse lookupTossPaymentForRecovery(
+        ConfirmPaymentRequest request,
+        Payment payment
+    ) {
+        try {
+            return tossPaymentClient.getPayment(request.paymentKey());
+        } catch (PaymentTossPaymentProcessingException lookupException) { // Toss 조회 실패로 결제 상태 확정 불가
+            if (lookupException.hasTossErrorCode(TOSS_NOT_FOUND_PAYMENT_CODE)) {
+                log.warn("[Payment] Toss 조회 결과 결제 기록이 없어 confirm 재시도를 진행합니다. paymentId={}, paymentKey={}",
+                    request.paymentId(), request.paymentKey());
+                return null;
+            }
+            log.warn("[Payment] Toss 결제 상태 조회 실패. EXECUTING 상태로 후속 복구 대상에 남깁니다. paymentId={}, paymentKey={}, tossCode={}, httpStatus={}",
+                request.paymentId(), request.paymentKey(), lookupException.getTossErrorCode(),
+                lookupException.getHttpStatus());
+            throw new PaymentRecoveryRequiredException(payment.getOrderId());
+        }
+    }
+
+    /** 같은 paymentId 멱등키로 confirm을 한 번만 재시도한다. */
+    private TossPaymentConfirmResponse retryConfirmOnceForRecovery(
+        ConfirmPaymentRequest request,
+        Payment payment
+    ) {
+        try {
+            TossPaymentConfirmResponse retryResponse = tossPaymentClient.confirm(
+                new TossPaymentConfirmRequest(request.paymentId(), request.paymentKey(), request.amount()),
+                String.valueOf(request.paymentId())
+            );
+            return completePayment(payment, retryResponse);
+        } catch (PaymentTossPaymentProcessingException retryException) { // confirm 재시도 실패 유형 확인
+            if (retryException.getFailureType() == TossPaymentFailureType.CONFIRMED_FAILURE) { // 재시도 결과 결제 실패가 확정된 경우
+                failPaymentAndRestore(payment);
+                throw new PaymentConfirmExternalException(request.paymentId(), request.paymentKey(), retryException);
+            }
+            log.warn("[Payment] Toss confirm 재시도 결과도 불확실합니다. EXECUTING 상태로 후속 복구 대상에 남깁니다. paymentId={}, paymentKey={}, tossCode={}, httpStatus={}",
+                request.paymentId(), request.paymentKey(), retryException.getTossErrorCode(),
+                retryException.getHttpStatus());
+            throw new PaymentRecoveryRequiredException(payment.getOrderId());
+        } catch (PaymentException exception) {
+            failPaymentAndRestore(payment);
+            throw new PaymentConfirmExternalException(request.paymentId(), request.paymentKey(), exception);
+        } catch (RuntimeException exception) {
+            log.warn("[Payment] Toss confirm 재시도 중 알 수 없는 예외가 발생했습니다. EXECUTING 상태로 후속 복구 대상에 남깁니다. paymentId={}, paymentKey={}",
+                request.paymentId(), request.paymentKey(), exception);
+            throw new PaymentRecoveryRequiredException(payment.getOrderId());
+        }
+    }
+
+    /** Toss 성공 결과를 기준으로 결제, 주문, 예약 재고를 완료 처리한다. */
+    private TossPaymentConfirmResponse completePayment(Payment payment, TossPaymentConfirmResponse response) {
+        // 결제 승인 완료
+        payment.complete();
+
+        log.info("[Payment] 결제 승인 완료. paymentKey={}, paymentId={}, amount={}",
+            response.paymentKey(), response.orderId(), response.totalAmount());
+
+        // Order 완료 처리
+        orderClient.updateCompleteOrder(payment.getOrderId());
+
+        stockReservationService.complete(payment.getId());
+        paymentRepository.save(payment);
+        return response;
+    }
+
+    /** 결제를 실패로 닫고 주문과 예약 재고를 결제 전 상태로 복구한다. */
+    private void failPaymentAndRestore(Payment payment) {
+        payment.fail();
+        paymentRepository.save(payment);
+
+        // Order 상태 pending 변경
+        orderClient.updatePendingOrder(payment.getOrderId());
+
+        stockReservationService.restore(payment.getId());
     }
 }

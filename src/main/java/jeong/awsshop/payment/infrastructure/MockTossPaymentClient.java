@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import jeong.awsshop.payment.infrastructure.tosspayment.TossPaymentStatus;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmRequest;
 import jeong.awsshop.payment.infrastructure.tosspayment.dto.TossPaymentConfirmResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "app.payment.toss.mode", havingValue = "mock")
 public class MockTossPaymentClient implements TossPaymentGateway {
 
-    private static final String DONE_STATUS = "DONE";
     private static final String MOCK_METHOD = "CARD";
 
     private final AtomicInteger confirmCount = new AtomicInteger();
@@ -21,7 +21,7 @@ public class MockTossPaymentClient implements TossPaymentGateway {
 
     /** Toss confirm 성공 응답을 반환하고 호출 횟수와 요청 이력을 기록한다. */
     @Override
-    public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request) {
+    public TossPaymentConfirmResponse confirm(TossPaymentConfirmRequest request, String idempotencyKey) {
         confirmCount.incrementAndGet();
         confirmRequests.add(request);
 
@@ -30,7 +30,7 @@ public class MockTossPaymentClient implements TossPaymentGateway {
             request.paymentKey(),
             String.valueOf(request.orderId()),
             MOCK_METHOD,
-            DONE_STATUS,
+            TossPaymentStatus.DONE.name(),
             request.amount().longValue(),
             now,
             now
@@ -45,7 +45,7 @@ public class MockTossPaymentClient implements TossPaymentGateway {
             paymentKey,
             null,
             MOCK_METHOD,
-            DONE_STATUS,
+            TossPaymentStatus.DONE.name(),
             0L,
             now,
             now

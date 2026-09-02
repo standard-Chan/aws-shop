@@ -12,6 +12,7 @@
 - [problem/ORDER_PAYMENT_CREATION_GAP.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/problem/ORDER_PAYMENT_CREATION_GAP.md)
 - [problem/PAYMENT_EXECUTING_BEFORE_TOSS_CONFIRM.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/problem/PAYMENT_EXECUTING_BEFORE_TOSS_CONFIRM.md)
 - [problem/PAYMENT_CONFIRM_CONCURRENCY_CAS.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/problem/PAYMENT_CONFIRM_CONCURRENCY_CAS.md)
+- [problem/TOSS_CONFIRM_UNCERTAIN_RESULT.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/problem/TOSS_CONFIRM_UNCERTAIN_RESULT.md)
 - [problem/OVER_ENGINEERING_CHECK.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/problem/OVER_ENGINEERING_CHECK.md)
 - [diagram/PAYMENT_SEQUENCE_DIAGRAM.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/diagram/PAYMENT_SEQUENCE_DIAGRAM.md)
 - [exception/EXCEPTION.md](/mnt/c/Users/정석찬/Desktop/project/aws-shop/docs/payment/exception/EXCEPTION.md)
